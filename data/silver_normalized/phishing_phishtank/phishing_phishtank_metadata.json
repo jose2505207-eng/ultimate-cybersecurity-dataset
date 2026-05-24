@@ -1,0 +1,44 @@
+{
+  "binary_label_distribution": {},
+  "created_at_utc": "2026-05-24T18:16:23.877859+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.015,
+  "input_hash": "7252a7b608538108b91e1ccefaee52e88da7c7994d72678561979228391025a0",
+  "input_paths": [
+    "phishtank"
+  ],
+  "known_limitations": [
+    "Local PhishTank file is not a valid CSV export; it contains a rate-limit response instead of URL records."
+  ],
+  "label_distribution": {},
+  "license": "RESTRICTED:PhishTank",
+  "license_compatibility": "restricted_other",
+  "main_category": "Phishing, Social Engineering & Fraud",
+  "normalizer_script": "scripts/normalizers/phishing_phishtank.py",
+  "normalizer_version": "0.1.0",
+  "notes": "Local PhishTank file is not a valid CSV export; it contains a rate-limit response instead of URL records.",
+  "output_bytes": {
+    "csv_gz": 0,
+    "parquet": 0
+  },
+  "output_paths": {},
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 0,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 0,
+    "method": null,
+    "original_rows": 0,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "phishtank",
+  "source_type": "phishing_url",
+  "status": "blocked"
+}

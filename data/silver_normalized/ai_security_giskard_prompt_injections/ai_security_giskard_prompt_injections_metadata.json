@@ -1,0 +1,50 @@
+{
+  "binary_label_distribution": {
+    "1": 35
+  },
+  "created_at_utc": "2026-05-24T17:57:22.857040+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.034,
+  "input_hash": "a5ffcc9e0ecb5f37a0dc3ac1fe234f9855fa362054ce8cabb7fa4f15010a72cc",
+  "input_paths": [
+    "giskard_prompt_injections"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "jailbreak_prompt": 20,
+    "malicious_prompt": 15
+  },
+  "license": "UNKNOWN",
+  "license_compatibility": "unknown",
+  "main_category": "AI, LLM & ML Security",
+  "normalizer_script": "scripts/normalizers/ai_security_giskard_prompt_injections.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 11826,
+    "parquet": 34332
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/ai_security_giskard_prompt_injections/ai_security_giskard_prompt_injections.csv.gz",
+    "parquet": "data/silver_normalized/ai_security_giskard_prompt_injections/ai_security_giskard_prompt_injections.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 35,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 35,
+    "method": null,
+    "original_rows": 35,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "giskard_prompt_injections",
+  "source_type": "prompt_text",
+  "status": "ok"
+}

@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+secrets/
+credentials/
+api_keys.txt
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+
+# Raw heavy data - do not push bronze/raw sources unless explicitly approved
+data/bronze_raw/
+
+# Generated handoff artifacts can be regenerated
+handoff_silver_testing/
+handoff_silver_testing.zip
+
+# OS/editor
+.vscode/
+.idea/

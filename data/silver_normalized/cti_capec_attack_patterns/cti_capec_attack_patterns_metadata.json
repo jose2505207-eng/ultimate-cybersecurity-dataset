@@ -1,0 +1,44 @@
+{
+  "binary_label_distribution": {},
+  "created_at_utc": "2026-05-24T18:16:23.353530+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.014,
+  "input_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "input_paths": [
+    "capec"
+  ],
+  "known_limitations": [
+    "No CAPEC CSV/XML source is present under data/bronze_raw/capec."
+  ],
+  "label_distribution": {},
+  "license": "CAPEC-MITRE",
+  "license_compatibility": "permissive",
+  "main_category": "Threat Intelligence, CVE, Advisory & Taxonomy",
+  "normalizer_script": "scripts/normalizers/cti_capec_attack_patterns.py",
+  "normalizer_version": "0.1.0",
+  "notes": "No CAPEC CSV/XML source is present under data/bronze_raw/capec.",
+  "output_bytes": {
+    "csv_gz": 0,
+    "parquet": 0
+  },
+  "output_paths": {},
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 0,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 0,
+    "method": null,
+    "original_rows": 0,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "capec",
+  "source_type": "cti_taxonomy",
+  "status": "blocked"
+}

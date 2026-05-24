@@ -1,0 +1,66 @@
+{
+  "binary_label_distribution": {
+    "1": 5832
+  },
+  "created_at_utc": "2026-05-24T17:57:24.662243+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 123,
+    "duplicate_rows_removed": 156,
+    "sample_duplicate_record_ids": [
+      "ai_security_huggingface_prompt_injection::0ddb7ccc9a232c3f",
+      "ai_security_huggingface_prompt_injection::124f7565f534dfb4",
+      "ai_security_huggingface_prompt_injection::335ffc654d92c3f6",
+      "ai_security_huggingface_prompt_injection::3447252b8070744e",
+      "ai_security_huggingface_prompt_injection::5091e4e5d49e2e02",
+      "ai_security_huggingface_prompt_injection::5fd69350305ed8db",
+      "ai_security_huggingface_prompt_injection::8751061f33232e4c",
+      "ai_security_huggingface_prompt_injection::8a9206a1db7a18b4",
+      "ai_security_huggingface_prompt_injection::a780ae64e57d7abb",
+      "ai_security_huggingface_prompt_injection::b9ab14316c434344",
+      "ai_security_huggingface_prompt_injection::bc7387b07e6ec149",
+      "ai_security_huggingface_prompt_injection::c802afd6dc241d06",
+      "ai_security_huggingface_prompt_injection::d795556467f9649e",
+      "ai_security_huggingface_prompt_injection::e9aad73afa49b059",
+      "ai_security_huggingface_prompt_injection::f7a94ddadb8ef140",
+      "ai_security_huggingface_prompt_injection::fd9506bb40b954b0"
+    ]
+  },
+  "duration_seconds": 0.704,
+  "input_hash": "7c39bfbc9a3834eaf45474780be068711c93420c4a1d1e6353d68fd126955834",
+  "input_paths": [
+    "huggingface"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "malicious_prompt": 5832
+  },
+  "license": "UNKNOWN",
+  "license_compatibility": "unknown",
+  "main_category": "AI, LLM & ML Security",
+  "normalizer_script": "scripts/normalizers/ai_security_huggingface_prompt_injection.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 1116237,
+    "parquet": 1702973
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/ai_security_huggingface_prompt_injection/ai_security_huggingface_prompt_injection.csv.gz",
+    "parquet": "data/silver_normalized/ai_security_huggingface_prompt_injection/ai_security_huggingface_prompt_injection.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 5832,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 5832,
+    "method": null,
+    "original_rows": 5988,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "huggingface",
+  "source_type": "prompt_text",
+  "status": "ok"
+}

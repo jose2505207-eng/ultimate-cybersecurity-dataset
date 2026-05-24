@@ -1,0 +1,49 @@
+{
+  "binary_label_distribution": {
+    "1": 1000
+  },
+  "created_at_utc": "2026-05-24T17:57:25.723792+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.105,
+  "input_hash": "31d5361d5baa4156bc53910a701d62f5650b188b78cb04231acea41176debf1c",
+  "input_paths": [
+    "huggingface_ai_security"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "malicious_prompt": 1000
+  },
+  "license": "UNKNOWN",
+  "license_compatibility": "unknown",
+  "main_category": "AI, LLM & ML Security",
+  "normalizer_script": "scripts/normalizers/ai_security_lakera_gandalf.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 51223,
+    "parquet": 89855
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/ai_security_lakera_gandalf/ai_security_lakera_gandalf.csv.gz",
+    "parquet": "data/silver_normalized/ai_security_lakera_gandalf/ai_security_lakera_gandalf.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 1000,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 1000,
+    "method": null,
+    "original_rows": 1000,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "huggingface_ai_security",
+  "source_type": "prompt_text",
+  "status": "ok"
+}

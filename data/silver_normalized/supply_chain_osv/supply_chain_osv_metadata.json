@@ -1,0 +1,69 @@
+{
+  "binary_label_distribution": {
+    "1": 49827
+  },
+  "created_at_utc": "2026-05-24T17:59:06.083657+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 152,
+    "duplicate_rows_removed": 173,
+    "sample_duplicate_record_ids": [
+      "supply_chain_osv::089af701db750025",
+      "supply_chain_osv::0ab3d67195af7422",
+      "supply_chain_osv::1af8c07c264747bf",
+      "supply_chain_osv::278f46cb55f24ed1",
+      "supply_chain_osv::3ae71fe9f3d41cdd",
+      "supply_chain_osv::3b03ee80421f8edb",
+      "supply_chain_osv::436c3ca4eed6e69f",
+      "supply_chain_osv::68c6fbde2721f48e",
+      "supply_chain_osv::6924506b927e2287",
+      "supply_chain_osv::b6337684d801d9b1",
+      "supply_chain_osv::b811fef2278f3313",
+      "supply_chain_osv::c505c49303759abc",
+      "supply_chain_osv::d1243fbbfa965f22",
+      "supply_chain_osv::dcebf24318e25600",
+      "supply_chain_osv::ec3050b6b309d8c6",
+      "supply_chain_osv::f7ca07a20dc73c3f",
+      "supply_chain_osv::f7ef0be3505d39a1",
+      "supply_chain_osv::f968d282c44c8fd1",
+      "supply_chain_osv::fad7859ffaf3cdd6"
+    ]
+  },
+  "duration_seconds": 25.805,
+  "input_hash": "3da28d0047fd3fcf1e794d375263c98dd4691923f9047791a2ce3b9a332607c3",
+  "input_paths": [
+    "osv"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "vulnerable_dependency": 49827
+  },
+  "license": "CC-BY-4.0",
+  "license_compatibility": "permissive",
+  "main_category": "Supply Chain & Open Source Package Security",
+  "normalizer_script": "scripts/normalizers/supply_chain_osv.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 20756652,
+    "parquet": 31291385
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/supply_chain_osv/supply_chain_osv.csv.gz",
+    "parquet": "data/silver_normalized/supply_chain_osv/supply_chain_osv.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 49827,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 49827,
+    "method": null,
+    "original_rows": 50000,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "osv",
+  "source_type": "package_metadata",
+  "status": "ok"
+}

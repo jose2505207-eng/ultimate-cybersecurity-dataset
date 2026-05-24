@@ -1,0 +1,242 @@
+datasets:
+  - name: DiverseVul
+    source_type: code
+    main_category: vulnerable_code
+    access_mode: manual_or_public_archive
+    cleaner: clean_code
+    ingest_module: ingest_diversevul
+    safe_ingestion_status: metadata_or_redacted_code_only
+    license: Verify upstream terms before redistribution.
+  - name: CVEfixes
+    source_type: code
+    main_category: vulnerable_code
+    access_mode: manual_database_export
+    cleaner: clean_code
+    ingest_module: ingest_cvefixes
+    safe_ingestion_status: metadata_or_redacted_code_only
+    license: Verify upstream dataset and source repository licenses.
+  - name: SARD_Juliet
+    source_type: code
+    main_category: vulnerable_code
+    access_mode: manual_download
+    cleaner: clean_code
+    ingest_module: ingest_sard_juliet
+    safe_ingestion_status: synthetic_or_testcase_metadata
+    license: NIST/SARD usage terms apply.
+  - name: CICIDS2017
+    source_type: network_flow
+    main_category: network_intrusion
+    access_mode: manual_download
+    cleaner: clean_network
+    ingest_module: ingest_cicids2017
+    safe_ingestion_status: flow_features_only
+    license: Verify CIC dataset terms.
+  - name: CSE_CIC_IDS2018
+    source_type: network_flow
+    main_category: network_intrusion
+    access_mode: manual_download
+    cleaner: clean_network
+    ingest_module: ingest_cse_cic_ids2018
+    safe_ingestion_status: flow_features_only
+    license: Verify CIC dataset terms.
+  - name: UNSW_NB15
+    source_type: network_flow
+    main_category: network_intrusion
+    access_mode: manual_download
+    cleaner: clean_network
+    ingest_module: ingest_unsw_nb15
+    safe_ingestion_status: flow_features_only
+    license: Verify upstream terms.
+  - name: LANL_Auth
+    source_type: network_flow
+    main_category: credential_attack
+    access_mode: manual_download
+    cleaner: clean_network
+    ingest_module: ingest_lanl_auth
+    safe_ingestion_status: anonymized_auth_events_only
+    license: Verify LANL terms.
+  - name: BODMAS
+    source_type: malware_features
+    main_category: malware
+    access_mode: manual_download
+    cleaner: clean_malware
+    ingest_module: ingest_bodmas
+    safe_ingestion_status: features_hashes_only
+    license: Verify upstream terms.
+  - name: EMBER
+    source_type: malware_features
+    main_category: malware
+    access_mode: manual_download
+    cleaner: clean_malware
+    ingest_module: ingest_ember
+    safe_ingestion_status: features_only
+    license: Verify upstream terms.
+  - name: CICIOT2023
+    source_type: iot_flow
+    main_category: iot_attack
+    access_mode: manual_download
+    cleaner: clean_iot
+    ingest_module: ingest_ciciot2023
+    safe_ingestion_status: flow_features_only
+    license: Verify upstream terms.
+  - name: TON_IoT
+    source_type: iot_flow
+    main_category: iot_attack
+    access_mode: manual_download
+    cleaner: clean_iot
+    ingest_module: ingest_ton_iot
+    safe_ingestion_status: telemetry_features_only
+    license: Verify upstream terms.
+  - name: PhishTank
+    source_type: url
+    main_category: phishing_social_engineering
+    access_mode: api_or_manual_export
+    cleaner: clean_phishing
+    ingest_module: ingest_phishtank
+    safe_ingestion_status: defanged_urls_only
+    license: Verify PhishTank terms.
+  - name: URLhaus
+    source_type: url
+    main_category: malware
+    access_mode: public_feed_or_manual_export
+    cleaner: clean_phishing
+    ingest_module: ingest_urlhaus
+    safe_ingestion_status: defanged_urls_only
+    license: Verify abuse.ch terms.
+  - name: Enron
+    source_type: email
+    main_category: phishing_social_engineering
+    access_mode: manual_download
+    cleaner: clean_phishing
+    ingest_module: ingest_enron
+    safe_ingestion_status: redacted_email_text_only
+    license: Verify upstream terms and privacy constraints.
+  - name: Lakera_Gandalf
+    source_type: prompt
+    main_category: prompt_injection_ai_security
+    access_mode: manual_export
+    cleaner: clean_prompt_injection
+    ingest_module: ingest_lakera_gandalf
+    safe_ingestion_status: redacted_prompt_summaries_only
+    license: Verify upstream terms.
+  - name: HackAPrompt
+    source_type: prompt
+    main_category: prompt_injection_ai_security
+    access_mode: manual_download
+    cleaner: clean_prompt_injection
+    ingest_module: ingest_hackaprompt
+    safe_ingestion_status: redacted_prompt_summaries_only
+    license: Verify upstream terms.
+  - name: Giskard_Prompt_Injections
+    source_type: prompt
+    main_category: prompt_injection_ai_security
+    access_mode: manual_download
+    cleaner: clean_prompt_injection
+    ingest_module: ingest_giskard_prompt_injections
+    safe_ingestion_status: redacted_prompt_summaries_only
+    license: Verify upstream terms.
+  - name: MITRE_ATTACK
+    source_type: cti
+    main_category: threat_intelligence
+    access_mode: public_knowledge_base
+    cleaner: clean_cti
+    ingest_module: ingest_mitre_attack
+    safe_ingestion_status: reference_metadata_only
+    license: MITRE ATT&CK terms apply.
+  - name: CAPEC
+    source_type: cti
+    main_category: threat_intelligence
+    access_mode: public_knowledge_base
+    cleaner: clean_cti
+    ingest_module: ingest_capec
+    safe_ingestion_status: reference_metadata_only
+    license: MITRE CAPEC terms apply.
+  - name: CWE
+    source_type: cti
+    main_category: vulnerability_advisory
+    access_mode: public_knowledge_base
+    cleaner: clean_cti
+    ingest_module: ingest_cwe
+    safe_ingestion_status: reference_metadata_only
+    license: MITRE CWE terms apply.
+  - name: CISA_KEV
+    source_type: advisory
+    main_category: vulnerability_advisory
+    access_mode: public_catalog
+    cleaner: clean_cti
+    ingest_module: ingest_cisa_kev
+    safe_ingestion_status: advisory_metadata_only
+    license: CISA catalog terms apply.
+  - name: NVD
+    source_type: advisory
+    main_category: vulnerability_advisory
+    access_mode: public_api_or_manual_export
+    cleaner: clean_cti
+    ingest_module: ingest_nvd
+    safe_ingestion_status: advisory_metadata_only
+    license: NVD terms apply.
+  - name: OSV
+    source_type: advisory
+    main_category: supply_chain_attack
+    access_mode: public_api_or_manual_export
+    cleaner: clean_supply_chain
+    ingest_module: ingest_osv
+    safe_ingestion_status: advisory_metadata_only
+    license: OSV terms apply.
+  - name: GitHub_Advisories
+    source_type: advisory
+    main_category: supply_chain_attack
+    access_mode: api_or_manual_export
+    cleaner: clean_supply_chain
+    ingest_module: ingest_github_advisories
+    safe_ingestion_status: advisory_metadata_only
+    license: GitHub terms apply.
+  - name: Datadog_Malicious_Packages
+    source_type: advisory
+    main_category: supply_chain_attack
+    access_mode: manual_download
+    cleaner: clean_supply_chain
+    ingest_module: ingest_datadog_malicious_packages
+    safe_ingestion_status: package_metadata_only
+    license: Verify upstream terms.
+  - name: Mordor_Cloud
+    source_type: cloud_log
+    main_category: cloud_saas_abuse
+    access_mode: manual_download
+    cleaner: clean_cloud
+    ingest_module: ingest_mordor_cloud
+    safe_ingestion_status: redacted_logs_only
+    license: Verify Mordor terms.
+  - name: CICMalDroid
+    source_type: mobile_features
+    main_category: mobile_malware
+    access_mode: manual_download
+    cleaner: clean_mobile
+    ingest_module: ingest_cicmaldroid
+    safe_ingestion_status: features_only
+    license: Verify CIC dataset terms.
+  - name: AWID
+    source_type: network_flow
+    main_category: wireless_attack
+    access_mode: manual_download
+    cleaner: clean_network
+    ingest_module: ingest_awid
+    safe_ingestion_status: flow_features_only
+    license: Verify AWID terms.
+  - name: SWaT_WADI_or_TON_IoT_ICS
+    source_type: ics_telemetry
+    main_category: ics_ot_attack
+    access_mode: manual_download
+    cleaner: clean_iot
+    ingest_module: ingest_swat_wadi_or_ton_iot_ics
+    safe_ingestion_status: telemetry_features_only
+    license: Verify upstream terms.
+  - name: Ethereum_Smart_Contracts
+    source_type: code
+    main_category: blockchain_smart_contract
+    access_mode: manual_download
+    cleaner: clean_crypto
+    ingest_module: ingest_ethereum_smart_contracts
+    safe_ingestion_status: metadata_or_redacted_code_only
+    license: Verify source contract and dataset terms.
+

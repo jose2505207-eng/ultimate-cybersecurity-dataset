@@ -1,0 +1,49 @@
+{
+  "binary_label_distribution": {
+    "1": 918
+  },
+  "created_at_utc": "2026-05-24T17:57:28.254047+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.517,
+  "input_hash": "875b9bf7b9f4692e6c55b83150aac4c77e83716ef633e3794be2592063df37b0",
+  "input_paths": [
+    "mitre_attack_stix"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "attack_technique": 918
+  },
+  "license": "Apache-2.0",
+  "license_compatibility": "permissive",
+  "main_category": "Threat Intelligence, CVE, Advisory & Taxonomy",
+  "normalizer_script": "scripts/normalizers/cti_mitre_attack_stix.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 408054,
+    "parquet": 642026
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/cti_mitre_attack_stix/cti_mitre_attack_stix.csv.gz",
+    "parquet": "data/silver_normalized/cti_mitre_attack_stix/cti_mitre_attack_stix.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 918,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 918,
+    "method": null,
+    "original_rows": 918,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "mitre_attack_stix",
+  "source_type": "cti_taxonomy",
+  "status": "ok"
+}

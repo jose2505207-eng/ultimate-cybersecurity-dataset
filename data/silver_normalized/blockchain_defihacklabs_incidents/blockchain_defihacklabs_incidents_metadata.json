@@ -1,0 +1,49 @@
+{
+  "binary_label_distribution": {
+    "1": 627
+  },
+  "created_at_utc": "2026-05-24T18:10:39.506567+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.249,
+  "input_hash": "fcf5f329e129b0218409ff834d2c3f28a593baf8dfc3430d49f6c72a99e3d9d3",
+  "input_paths": [
+    "defihacklabs_incident_explorer"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "exploit_incident": 627
+  },
+  "license": "UNKNOWN",
+  "license_compatibility": "unknown",
+  "main_category": "Cryptocurrency & Blockchain Attacks",
+  "normalizer_script": "scripts/normalizers/blockchain_defihacklabs_incidents.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 246206,
+    "parquet": 391030
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/blockchain_defihacklabs_incidents/blockchain_defihacklabs_incidents.csv.gz",
+    "parquet": "data/silver_normalized/blockchain_defihacklabs_incidents/blockchain_defihacklabs_incidents.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 627,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 627,
+    "method": null,
+    "original_rows": 627,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "defihacklabs_incident_explorer",
+  "source_type": "defi_incident",
+  "status": "ok"
+}

@@ -1,0 +1,49 @@
+{
+  "binary_label_distribution": {
+    "1": 113
+  },
+  "created_at_utc": "2026-05-24T18:14:31.433878+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.873,
+  "input_hash": "f5692f206a8e6579f3630e081d42cbe4eff18abe0398f8eae288e8f79f6ecfef",
+  "input_paths": [
+    "otrf_security_datasets"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "attack_technique": 113
+  },
+  "license": "UNKNOWN",
+  "license_compatibility": "unknown",
+  "main_category": "Endpoint, Host & Windows/Sysmon Telemetry",
+  "normalizer_script": "scripts/normalizers/host_otrf_security_datasets.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 14863,
+    "parquet": 40855
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/host_otrf_security_datasets/host_otrf_security_datasets.csv.gz",
+    "parquet": "data/silver_normalized/host_otrf_security_datasets/host_otrf_security_datasets.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 113,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 113,
+    "method": null,
+    "original_rows": 113,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "otrf_security_datasets",
+  "source_type": "host_telemetry",
+  "status": "ok"
+}

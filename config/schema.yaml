@@ -1,0 +1,88 @@
+columns:
+  record_id:
+    type: string
+    nullable: false
+    unique: true
+  source_dataset:
+    type: string
+    nullable: false
+  source_type:
+    type: enum
+    nullable: false
+    values:
+      - code
+      - network_flow
+      - malware_features
+      - email
+      - url
+      - cti
+      - advisory
+      - prompt
+      - cloud_log
+      - mobile_features
+      - iot_flow
+      - ics_telemetry
+  main_category:
+    type: string
+    nullable: false
+  attack_name:
+    type: string
+    nullable: false
+  attack_family:
+    type: string
+    nullable: false
+  label:
+    type: enum
+    nullable: false
+    values:
+      - benign
+      - malicious
+      - vulnerable
+      - non-vulnerable
+      - phishing
+      - malware
+      - prompt_attack
+      - abuse
+      - cti_reference
+      - advisory
+      - unknown
+  binary_label:
+    type: integer
+    nullable: true
+    values: [0, 1]
+  mitre_tactic:
+    type: string
+    nullable: true
+  mitre_technique_id:
+    type: string
+    nullable: true
+  capec_id:
+    type: string
+    nullable: true
+  cwe_id:
+    type: string
+    nullable: true
+  cve_id:
+    type: string
+    nullable: true
+  severity:
+    type: enum
+    nullable: false
+    values: [low, medium, high, critical, unknown]
+  raw_text_or_features:
+    type: string
+    nullable: false
+  is_synthetic:
+    type: boolean
+    nullable: false
+  is_safe_representation:
+    type: boolean
+    nullable: false
+  license:
+    type: string
+    nullable: false
+  split:
+    type: enum
+    nullable: false
+    values: [train, validation, test]
+

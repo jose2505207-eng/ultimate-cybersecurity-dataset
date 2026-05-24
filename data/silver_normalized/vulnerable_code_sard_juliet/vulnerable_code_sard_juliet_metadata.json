@@ -1,0 +1,51 @@
+{
+  "binary_label_distribution": {
+    "0": 2782,
+    "1": 47218
+  },
+  "created_at_utc": "2026-05-24T18:15:17.119476+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 22.784,
+  "input_hash": "b65748bc732b7a27d5ffff412908beb5e567de4ec4a25ae72f61c6afea2c0798",
+  "input_paths": [
+    "2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "non_vulnerable_code": 2782,
+    "vulnerable_code": 47218
+  },
+  "license": "UNKNOWN",
+  "license_compatibility": "unknown",
+  "main_category": "Vulnerable Code & Software Weaknesses",
+  "normalizer_script": "scripts/normalizers/vulnerable_code_sard_juliet.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 19554011,
+    "parquet": 39950797
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/vulnerable_code_sard_juliet/vulnerable_code_sard_juliet.csv.gz",
+    "parquet": "data/silver_normalized/vulnerable_code_sard_juliet/vulnerable_code_sard_juliet.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 50000,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 50000,
+    "method": null,
+    "original_rows": 50000,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+  "source_type": "vulnerable_code",
+  "status": "ok"
+}

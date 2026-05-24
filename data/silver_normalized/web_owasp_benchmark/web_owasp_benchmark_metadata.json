@@ -1,0 +1,51 @@
+{
+  "binary_label_distribution": {
+    "0": 1325,
+    "1": 1415
+  },
+  "created_at_utc": "2026-05-24T18:19:32.053538+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 2.117,
+  "input_hash": "82185912a6498f9d8b3642a75e1609d09015747c00b84a4f4c0825c1f0334c23",
+  "input_paths": [
+    "owasp_benchmark"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "non_vulnerable_code": 1325,
+    "vulnerable_code": 1415
+  },
+  "license": "GPL-2.0-only",
+  "license_compatibility": "restricted_other",
+  "main_category": "Web Application Security",
+  "normalizer_script": "scripts/normalizers/web_owasp_benchmark.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 1014832,
+    "parquet": 2205747
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/web_owasp_benchmark/web_owasp_benchmark.csv.gz",
+    "parquet": "data/silver_normalized/web_owasp_benchmark/web_owasp_benchmark.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 2740,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 2740,
+    "method": null,
+    "original_rows": 2740,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "owasp_benchmark",
+  "source_type": "web_app_request",
+  "status": "ok"
+}

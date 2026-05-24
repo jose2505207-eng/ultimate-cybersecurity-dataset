@@ -1,0 +1,51 @@
+{
+  "binary_label_distribution": {
+    "0": 26066,
+    "1": 23934
+  },
+  "created_at_utc": "2026-05-24T17:57:32.290919+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 3.404,
+  "input_hash": "0f64ed22f2e3521d48002b501eee5fa5f6ab12e3bebdca9841f0a9af9823c580",
+  "input_paths": [
+    "phishing_balanced_urls"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "benign_url": 26066,
+    "phishing": 23934
+  },
+  "license": "UNKNOWN",
+  "license_compatibility": "unknown",
+  "main_category": "Phishing, Social Engineering & Fraud",
+  "normalizer_script": "scripts/normalizers/phishing_balanced_urls.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 2184108,
+    "parquet": 3593328
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/phishing_balanced_urls/phishing_balanced_urls.csv.gz",
+    "parquet": "data/silver_normalized/phishing_balanced_urls/phishing_balanced_urls.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 50000,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 50000,
+    "method": null,
+    "original_rows": 50000,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "phishing_balanced_urls",
+  "source_type": "phishing_url",
+  "status": "ok"
+}

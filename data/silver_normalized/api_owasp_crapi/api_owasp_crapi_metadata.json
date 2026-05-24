@@ -1,0 +1,49 @@
+{
+  "binary_label_distribution": {
+    "1": 18
+  },
+  "created_at_utc": "2026-05-24T18:14:30.004050+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.193,
+  "input_hash": "5b65e8709e11782b950aa7b8ac51aa771bca1ffa88507160c9acc8158c7b2075",
+  "input_paths": [
+    "owasp_api_security"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "attack_pattern": 18
+  },
+  "license": "Apache-2.0",
+  "license_compatibility": "permissive",
+  "main_category": "API Security",
+  "normalizer_script": "scripts/normalizers/api_owasp_crapi.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 2381,
+    "parquet": 20709
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/api_owasp_crapi/api_owasp_crapi.csv.gz",
+    "parquet": "data/silver_normalized/api_owasp_crapi/api_owasp_crapi.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 18,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 18,
+    "method": null,
+    "original_rows": 18,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "owasp_api_security",
+  "source_type": "api_request",
+  "status": "ok"
+}

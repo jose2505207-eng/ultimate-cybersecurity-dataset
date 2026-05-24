@@ -1,0 +1,46 @@
+mappings:
+  vulnerable:
+    label: vulnerable
+    binary_label: 1
+    attack_family: Software Weakness
+  non-vulnerable:
+    label: non-vulnerable
+    binary_label: 0
+    attack_family: Benign Code
+  benign:
+    label: benign
+    binary_label: 0
+    attack_family: Benign
+  malicious:
+    label: malicious
+    binary_label: 1
+    attack_family: Malicious Activity
+  malware:
+    label: malware
+    binary_label: 1
+    attack_family: Malware
+  phishing:
+    label: phishing
+    binary_label: 1
+    attack_family: Phishing
+  prompt_attack:
+    label: prompt_attack
+    binary_label: 1
+    attack_family: AI Security
+  abuse:
+    label: abuse
+    binary_label: 1
+    attack_family: Abuse
+  cti_reference:
+    label: cti_reference
+    binary_label: null
+    attack_family: Threat Intelligence
+  advisory:
+    label: advisory
+    binary_label: null
+    attack_family: Vulnerability Advisory
+default:
+  label: unknown
+  binary_label: null
+  attack_family: Unknown
+

@@ -1,0 +1,29 @@
+max_rows: 100000
+random_seed: 42
+split_ratios:
+  train: 0.8
+  validation: 0.1
+  test: 0.1
+category_quotas:
+  vulnerable_code: 9000
+  web_application_attack: 6000
+  network_intrusion: 9000
+  denial_of_service: 6000
+  malware: 9000
+  ransomware: 3000
+  phishing_social_engineering: 7000
+  credential_attack: 5000
+  data_exfiltration: 4000
+  cloud_saas_abuse: 5000
+  supply_chain_attack: 5000
+  prompt_injection_ai_security: 5000
+  threat_intelligence: 4000
+  vulnerability_advisory: 5000
+  iot_attack: 6000
+  ics_ot_attack: 5000
+  mobile_malware: 4000
+  wireless_attack: 3000
+  blockchain_smart_contract: 3000
+  benign_reference: 7000
+source_minimum_rows: 0
+

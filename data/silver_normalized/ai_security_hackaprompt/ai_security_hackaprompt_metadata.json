@@ -1,0 +1,44 @@
+{
+  "binary_label_distribution": {},
+  "created_at_utc": "2026-05-24T18:16:22.830599+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 0.015,
+  "input_hash": "b908499461e5a2f2dc1b92845fee8e7edbe64f73da0f2133f9e9c69c36e7e14c",
+  "input_paths": [
+    "ai_security_prompt_injection"
+  ],
+  "known_limitations": [
+    "HackAPrompt bronze input contains README/metadata only; no local CSV/JSON/Parquet prompt records were found."
+  ],
+  "label_distribution": {},
+  "license": "UNKNOWN",
+  "license_compatibility": "unknown",
+  "main_category": "AI, LLM & ML Security",
+  "normalizer_script": "scripts/normalizers/ai_security_hackaprompt.py",
+  "normalizer_version": "0.1.0",
+  "notes": "HackAPrompt bronze input contains README/metadata only; no local CSV/JSON/Parquet prompt records were found.",
+  "output_bytes": {
+    "csv_gz": 0,
+    "parquet": 0
+  },
+  "output_paths": {},
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 0,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 0,
+    "method": null,
+    "original_rows": 0,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "ai_security_prompt_injection",
+  "source_type": "prompt_text",
+  "status": "blocked"
+}

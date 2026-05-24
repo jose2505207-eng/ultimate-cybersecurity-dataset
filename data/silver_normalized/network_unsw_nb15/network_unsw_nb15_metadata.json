@@ -1,0 +1,51 @@
+{
+  "binary_label_distribution": {
+    "0": 20520,
+    "1": 29480
+  },
+  "created_at_utc": "2026-05-24T18:19:24.865593+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 0,
+    "duplicate_rows_removed": 0,
+    "sample_duplicate_record_ids": []
+  },
+  "duration_seconds": 4.036,
+  "input_hash": "06b60561701c0cad982a99be51816d00856a287e727d1c068c98e07b4fa0c783",
+  "input_paths": [
+    "OneDrive_1_5-23-2026.zip"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "benign": 20520,
+    "intrusion": 29480
+  },
+  "license": "RESTRICTED:UNSW-Academic",
+  "license_compatibility": "restricted_academic",
+  "main_category": "Network Intrusion & Traffic Attacks",
+  "normalizer_script": "scripts/normalizers/network_unsw_nb15.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 4777362,
+    "parquet": 9834709
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/network_unsw_nb15/network_unsw_nb15.csv.gz",
+    "parquet": "data/silver_normalized/network_unsw_nb15/network_unsw_nb15.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 50000,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 50000,
+    "method": null,
+    "original_rows": 50000,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "unsw_nb15",
+  "source_type": "network_flow",
+  "status": "ok"
+}

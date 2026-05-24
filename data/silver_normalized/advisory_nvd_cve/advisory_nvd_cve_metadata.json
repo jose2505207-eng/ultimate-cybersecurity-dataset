@@ -1,0 +1,70 @@
+{
+  "binary_label_distribution": {
+    "1": 40704
+  },
+  "created_at_utc": "2026-05-24T17:57:19.127493+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 9296,
+    "duplicate_rows_removed": 9296,
+    "sample_duplicate_record_ids": [
+      "advisory_nvd_cve::05d69687d52b0c5d",
+      "advisory_nvd_cve::0b88c1d64584c665",
+      "advisory_nvd_cve::1c0a5337614d2329",
+      "advisory_nvd_cve::21deeda91d41d2d6",
+      "advisory_nvd_cve::23c6e2f5dbaa7f58",
+      "advisory_nvd_cve::2cca5db839747991",
+      "advisory_nvd_cve::2f174a8cb5e81ca7",
+      "advisory_nvd_cve::4ac503fccde6e1f1",
+      "advisory_nvd_cve::5d3e5bc0763c8e73",
+      "advisory_nvd_cve::6d909b1376746a9f",
+      "advisory_nvd_cve::85d5f93c5c7bf31b",
+      "advisory_nvd_cve::8bd63fc8caac500f",
+      "advisory_nvd_cve::9bec5f668f0b0678",
+      "advisory_nvd_cve::a06e24646703519d",
+      "advisory_nvd_cve::b10e686d4f504a79",
+      "advisory_nvd_cve::b3709fc18b466a99",
+      "advisory_nvd_cve::b7af09cf3a5954b4",
+      "advisory_nvd_cve::f037a8ad22882c5d",
+      "advisory_nvd_cve::f77447b11f211fa8",
+      "advisory_nvd_cve::fcda905a72c65647"
+    ]
+  },
+  "duration_seconds": 18.407,
+  "input_hash": "6f9f7bf3a4433ba4b1ab6795bb8e7c3422028d7f2b078ec50819fc3866d826b6",
+  "input_paths": [
+    "nvd_cve"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "vulnerability_advisory": 40704
+  },
+  "license": "NVD-Public-Domain",
+  "license_compatibility": "permissive",
+  "main_category": "Threat Intelligence, CVE, Advisory & Taxonomy",
+  "normalizer_script": "scripts/normalizers/advisory_nvd_cve.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 8823307,
+    "parquet": 12005199
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/advisory_nvd_cve/advisory_nvd_cve.csv.gz",
+    "parquet": "data/silver_normalized/advisory_nvd_cve/advisory_nvd_cve.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 40704,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 40704,
+    "method": null,
+    "original_rows": 50000,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "nvd_cve",
+  "source_type": "vulnerability_advisory",
+  "status": "ok"
+}

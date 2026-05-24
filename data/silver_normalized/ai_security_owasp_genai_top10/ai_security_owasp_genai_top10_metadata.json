@@ -1,0 +1,60 @@
+{
+  "binary_label_distribution": {
+    "1": 10
+  },
+  "created_at_utc": "2026-05-24T17:57:26.656959+00:00",
+  "deduplication": {
+    "duplicate_record_ids": 10,
+    "duplicate_rows_removed": 639,
+    "sample_duplicate_record_ids": [
+      "ai_security_owasp_genai_top10::566b00359daf21cd",
+      "ai_security_owasp_genai_top10::84cb662d46701eb8",
+      "ai_security_owasp_genai_top10::97cc85a2ec935436",
+      "ai_security_owasp_genai_top10::a2edd7640438f1b9",
+      "ai_security_owasp_genai_top10::aa4b944a6dfdc249",
+      "ai_security_owasp_genai_top10::b87bb021bdf602e5",
+      "ai_security_owasp_genai_top10::baa140286f7f19a2",
+      "ai_security_owasp_genai_top10::c265b9fa97fb1601",
+      "ai_security_owasp_genai_top10::d4e8c36d8db878ce",
+      "ai_security_owasp_genai_top10::ea11bbd8ae894839"
+    ]
+  },
+  "duration_seconds": 0.347,
+  "input_hash": "641088230a33e1941ce407d7ed2c9ee523516f28b4cddd24f0b4e447e1ea7016",
+  "input_paths": [
+    "owasp_genai_top10"
+  ],
+  "known_limitations": [],
+  "label_distribution": {
+    "ai_security_risk": 10
+  },
+  "license": "CC-BY-SA-4.0",
+  "license_compatibility": "permissive",
+  "main_category": "AI, LLM & ML Security",
+  "normalizer_script": "scripts/normalizers/ai_security_owasp_genai_top10.py",
+  "normalizer_version": "0.1.0",
+  "notes": "",
+  "output_bytes": {
+    "csv_gz": 7474,
+    "parquet": 35471
+  },
+  "output_paths": {
+    "csv_gz": "data/silver_normalized/ai_security_owasp_genai_top10/ai_security_owasp_genai_top10.csv.gz",
+    "parquet": "data/silver_normalized/ai_security_owasp_genai_top10/ai_security_owasp_genai_top10.parquet"
+  },
+  "pandas_version": "3.0.3",
+  "pyarrow_version": "24.0.0",
+  "python_version": "3.12.3",
+  "row_count": 10,
+  "sampling": {
+    "applied": false,
+    "kept_rows": 10,
+    "method": null,
+    "original_rows": 649,
+    "seed": 42
+  },
+  "schema_version": "1.0.0",
+  "source_dataset": "owasp_genai_top10",
+  "source_type": "cti_taxonomy",
+  "status": "ok"
+}
