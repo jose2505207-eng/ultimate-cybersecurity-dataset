@@ -20,6 +20,7 @@ from scripts.normalizers.common import (
     validate_against_schema,
     write_silver,
 )
+from scripts.normalizers.base import parse_capec
 from scripts.normalizers.schema import COLUMN_ORDER, SCHEMA_VERSION, SilverRecord, assert_schema_sync
 
 
@@ -133,3 +134,31 @@ def test_runner_dry_run_does_not_write_metadata(tmp_path):
     )
     assert '"would_status": "blocked"' in proc.stdout
     assert not list(output.rglob("*_metadata.json"))
+
+
+def test_capec_xml_parser_maps_attack_pattern(tmp_path):
+    capec = tmp_path / "capec.xml"
+    capec.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<Attack_Pattern_Catalog>
+  <Attack_Patterns>
+    <Attack_Pattern ID="66" Name="SQL Injection" Abstraction="Standard" Status="Draft" Typical_Severity="High">
+      <Description>Manipulates SQL query construction.</Description>
+      <Extended_Description>Attacker-controlled input changes database query logic.</Extended_Description>
+      <Related_Weaknesses>
+        <Related_Weakness CWE_ID="89"/>
+      </Related_Weaknesses>
+      <Mitigations>
+        <Mitigation>Use parameterized queries.</Mitigation>
+      </Mitigations>
+    </Attack_Pattern>
+  </Attack_Patterns>
+</Attack_Pattern_Catalog>
+""",
+        encoding="utf-8",
+    )
+    df = parse_capec(tmp_path, limit=10, _=42)
+    assert len(df) == 1
+    assert df.loc[0, "label"] == "attack_pattern"
+    assert df.loc[0, "cwe_id"] == "CWE-89"
+    assert df.loc[0, "severity"] == "high"

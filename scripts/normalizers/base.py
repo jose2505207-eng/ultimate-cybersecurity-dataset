@@ -12,6 +12,7 @@ from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree as ET
 
 import pandas as pd
 
@@ -254,6 +255,118 @@ def parse_nvd(input_path: Path, limit: int | None, _: int) -> pd.DataFrame:
             if limit and len(rows) >= limit:
                 return pd.DataFrame(rows)
     return pd.DataFrame(rows)
+
+
+def _xml_text(element: ET.Element | None) -> str | None:
+    """Return normalized text from an XML element."""
+
+    if element is None:
+        return None
+    return clean_text(" ".join(part.strip() for part in element.itertext() if part and part.strip()))
+
+
+def _find_child(element: ET.Element, local_name: str) -> ET.Element | None:
+    """Find the first direct child by namespace-insensitive local name."""
+
+    suffix = f"}}{local_name}"
+    for child in list(element):
+        if child.tag == local_name or child.tag.endswith(suffix):
+            return child
+    return None
+
+
+def _find_descendants(element: ET.Element, local_name: str) -> list[ET.Element]:
+    """Find descendants by namespace-insensitive local name."""
+
+    suffix = f"}}{local_name}"
+    return [child for child in element.iter() if child.tag == local_name or child.tag.endswith(suffix)]
+
+
+def parse_capec(input_path: Path, limit: int | None, _: int) -> pd.DataFrame:
+    """Parse local CAPEC XML/CSV attack pattern exports."""
+
+    rows = []
+    files = latest_files(input_path, ["*.xml", "*.csv"]) if input_path.exists() else []
+    for path in files:
+        if path.suffix.lower() == ".xml":
+            rows.extend(_parse_capec_xml(path, limit, len(rows)))
+        elif path.suffix.lower() == ".csv":
+            rows.extend(_parse_capec_csv(path, limit, len(rows)))
+        if limit and len(rows) >= limit:
+            return pd.DataFrame(rows[:limit])
+    return pd.DataFrame(rows)
+
+
+def _parse_capec_xml(path: Path, limit: int | None, existing: int) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    root = ET.parse(path).getroot()
+    for pattern in _find_descendants(root, "Attack_Pattern"):
+        status = str(pattern.attrib.get("Status", "")).lower()
+        if status in {"deprecated", "obsolete"}:
+            continue
+        capec_id = pattern.attrib.get("ID") or pattern.attrib.get("Name")
+        cwes = [f"CWE-{w.attrib.get('CWE_ID')}" for w in _find_descendants(pattern, "Related_Weakness") if w.attrib.get("CWE_ID")]
+        mitigations = [_xml_text(m) for m in _find_descendants(pattern, "Mitigation")]
+        descriptions = [
+            _xml_text(_find_child(pattern, "Description")),
+            _xml_text(_find_child(pattern, "Extended_Description")),
+            "Mitigations: " + " ".join(m for m in mitigations if m) if mitigations else None,
+        ]
+        rows.append(
+            {
+                "record_id": make_record_id("cti_capec_attack_patterns", str(capec_id)),
+                "attack_name": pattern.attrib.get("Name"),
+                "attack_family": pattern.attrib.get("Abstraction"),
+                "label": "attack_pattern",
+                "binary_label": 1,
+                "cwe_id": cwes[0] if cwes else None,
+                "severity": normalize_severity(vendor_severity=pattern.attrib.get("Typical_Severity"))[0] if pattern.attrib.get("Typical_Severity") else None,
+                "raw_text": "\n\n".join(part for part in descriptions if part),
+                "features_json": safe_json_dumps({"capec_id": capec_id, "cwe_ids": cwes, "status": pattern.attrib.get("Status")}),
+                "source_file": rel(path),
+            }
+        )
+        if limit and existing + len(rows) >= limit:
+            return rows
+    return rows
+
+
+def _parse_capec_csv(path: Path, limit: int | None, existing: int) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for chunk in safe_read_csv_chunks(path):
+        for rec in chunk.to_dict("records"):
+            lower = {str(k).lower().strip(): v for k, v in rec.items()}
+            capec_id = lower.get("id") or lower.get("capec id") or lower.get("capec_id") or lower.get("capec-id")
+            name = lower.get("name") or lower.get("attack pattern name")
+            cwe_raw = str(lower.get("related weaknesses") or lower.get("related_weaknesses") or lower.get("cwe_id") or "")
+            cwes = [f"CWE-{m}" for m in re.findall(r"(?:CWE-)?(\\d+)", cwe_raw)]
+            severity = lower.get("typical severity") or lower.get("severity")
+            sev, _score = normalize_severity(vendor_severity=severity) if severity else (None, None)
+            rows.append(
+                {
+                    "record_id": make_record_id("cti_capec_attack_patterns", str(capec_id or name)),
+                    "attack_name": name,
+                    "attack_family": lower.get("abstraction") or lower.get("mechanisms of attack"),
+                    "label": "attack_pattern",
+                    "binary_label": 1,
+                    "cwe_id": cwes[0] if cwes else None,
+                    "severity": sev,
+                    "raw_text": "\n\n".join(
+                        str(part)
+                        for part in [
+                            lower.get("description"),
+                            lower.get("extended description") or lower.get("extended_description"),
+                            lower.get("mitigations"),
+                        ]
+                        if pd.notna(part) and str(part).strip()
+                    ),
+                    "features_json": safe_json_dumps({"capec_id": capec_id, "cwe_ids": cwes}),
+                    "source_file": rel(path),
+                }
+            )
+            if limit and existing + len(rows) >= limit:
+                return rows
+    return rows
 
 
 def _metric_score(metrics: dict[str, Any], key: str) -> float | None:
