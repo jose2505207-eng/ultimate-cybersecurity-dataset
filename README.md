@@ -6,7 +6,8 @@ This project separates raw source acquisition, source-specific cleaning, and fin
 
 - `data/bronze_raw/`: manually placed original datasets or source exports.
 - `data/silver_normalized/`: canonical silver-layer outputs. This is the only supported silver output path.
-- `data/gold_unified/`: merged benchmark files.
+- `data/gold/`: multi-head evaluation benchmark files.
+- `data/gold_unified/`: legacy merged benchmark files.
 - `data/reports/`: validation and coverage reports.
 
 The v1 scaffold does not download large, gated, credentialed, or license-sensitive datasets. Dataset access requirements are tracked in `config/datasets.yaml` and `LICENSE_NOTES.md`.
@@ -33,6 +34,40 @@ make validate
 ```
 
 `make smoke` creates a tiny safe synthetic silver fixture under `data/silver_normalized/` and a gold dataset for contract verification.
+
+## Multi-Head Gold Benchmark
+
+The current gold benchmark layer maps canonical silver rows into evaluation heads:
+
+- `malware_code`
+- `cti`
+- `prompt_injection_jailbreaks`
+
+It is extensible for `network_intrusion`, `phishing_social`, `cloud_saas_abuse`, `iot_ics`, and `supply_chain`.
+
+Build the multi-head benchmark:
+
+```bash
+python -m scripts.build_gold_benchmark \
+  --silver-dir data/silver_normalized \
+  --out-dir data/gold \
+  --max-rows 100000 \
+  --seed 42 \
+  --format both
+```
+
+Evaluate predictions:
+
+```bash
+python -m scripts.evaluate_benchmark \
+  --gold-file data/gold/benchmark_gold.csv \
+  --predictions-file path/to/predictions.csv \
+  --out-dir data/gold
+```
+
+Prediction files must include `record_id` and `prediction`. Optional columns are `model_name`, `score`, `probability`, `confidence`, and `explanation`.
+
+See `docs/gold_benchmark.md` for schema, metrics, task types, and Qwen2.5-14B adapter evaluation notes.
 
 ## Bronze Raw Layout
 

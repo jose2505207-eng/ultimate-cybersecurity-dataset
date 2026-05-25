@@ -1,0 +1,106 @@
+schema_version: "1.0"
+default_max_rows: 100000
+default_split:
+  train: 0.70
+  validation: 0.15
+  test: 0.15
+metric_weights:
+  classification: 0.50
+  generation: 0.15
+  knowledge: 0.20
+  reasoning: 0.15
+evaluation_heads:
+  malware_code:
+    description: Vulnerable code, malware features, binary labels, and CWE/CVE-oriented code security classification.
+    mapped_main_categories:
+      - Vulnerable Code & Software Weaknesses
+      - Malware & PE/Memory Features
+      - Web Application Security
+      - API Security
+      - Mobile Security
+    mapped_source_types:
+      - vulnerable_code
+      - malware_features
+      - malware_binary_metadata
+      - smart_contract_code
+      - smart_contract_bytecode_metadata
+      - web_app_request
+      - api_request
+      - mobile_app_metadata
+    allowed_task_types:
+      - classification
+      - knowledge
+      - reasoning
+    default_task_type: classification
+    metric_group: classification
+    default_weight: 1.0
+    extensibility_notes: Add static/dynamic malware metadata and deeper CWE/CVE mapping tasks as local sources become available.
+  cti:
+    description: Threat intelligence, MITRE ATT&CK mapping, CVE/advisory records, and threat knowledge tasks.
+    mapped_main_categories:
+      - Threat Intelligence, CVE, Advisory & Taxonomy
+      - Supply Chain & Open Source Package Security
+      - DNS, Exfiltration & C2 Abuse
+      - Cryptocurrency & Blockchain Attacks
+    mapped_source_types:
+      - cti_taxonomy
+      - vulnerability_advisory
+      - package_metadata
+      - dns_event
+      - defi_incident
+    allowed_task_types:
+      - classification
+      - knowledge
+      - reasoning
+    default_task_type: knowledge
+    metric_group: knowledge
+    default_weight: 1.0
+    extensibility_notes: Add CVE reasoning, advisory retrieval, and ATT&CK tactic/technique prediction tasks.
+  prompt_injection_jailbreaks:
+    description: Prompt injection, jailbreaks, AI security risk, and safe refusal/compliance evaluation metadata.
+    mapped_main_categories:
+      - AI, LLM & ML Security
+    mapped_source_types:
+      - prompt_text
+      - llm_io_pair
+    mapped_labels:
+      - malicious_prompt
+      - benign_prompt
+      - jailbreak_prompt
+      - ai_security_risk
+    allowed_task_types:
+      - classification
+      - generation
+      - reasoning
+    default_task_type: classification
+    metric_group: classification
+    default_weight: 1.0
+    extensibility_notes: Add refusal/compliance and jailbreak robustness generations when curated expected outputs exist.
+future_heads:
+  network_intrusion:
+    mapped_main_categories:
+      - Network Intrusion & Traffic Attacks
+    default_task_type: classification
+    metric_group: classification
+  phishing_social:
+    mapped_main_categories:
+      - Phishing, Social Engineering & Fraud
+    default_task_type: classification
+    metric_group: classification
+  cloud_saas_abuse:
+    mapped_main_categories:
+      - Cloud, SaaS & Identity Abuse
+      - Identity & Credential Attacks
+    default_task_type: classification
+    metric_group: classification
+  iot_ics:
+    mapped_main_categories:
+      - IoT, Embedded & Hardware Attacks
+      - ICS, OT & Critical Infrastructure Attacks
+    default_task_type: classification
+    metric_group: classification
+  supply_chain:
+    mapped_main_categories:
+      - Supply Chain & Open Source Package Security
+    default_task_type: knowledge
+    metric_group: knowledge

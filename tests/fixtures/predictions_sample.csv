@@ -1,0 +1,6 @@
+record_id,prediction,model_name,confidence
+sample::malware1,malicious,toy-model,0.91
+sample::code1,vulnerable_code,toy-model,0.89
+sample::cti1,T1110,toy-model,0.72
+sample::advisory1,CVE-2099-0001,toy-model,0.80
+sample::prompt1,malicious_prompt,toy-model,0.93

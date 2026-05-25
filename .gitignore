@@ -27,6 +27,13 @@ data/bronze_raw/
 handoff_silver_testing/
 handoff_silver_testing.zip
 
+# Generated gold benchmark/evaluation artifacts can be regenerated
+data/gold/benchmark_gold.csv
+data/gold/benchmark_gold.parquet
+data/gold/benchmark_manifest.json
+data/gold/evaluation_results.csv
+data/gold/evaluation_results.json
+
 # OS/editor
 .vscode/
 .idea/

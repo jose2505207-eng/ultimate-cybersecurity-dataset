@@ -1,0 +1,6 @@
+record_id,source_dataset,source_type,main_category,attack_name,attack_family,label,binary_label,mitre_tactic,mitre_technique_id,cwe_id,cve_id,raw_text,features_json,source_file,license,notes
+sample::malware1,safe_malware_fixture,malware_features,Malware & PE/Memory Features,Toy suspicious binary,Toy family,malicious,1,,,,,"Safe toy malware-feature summary.",{},fixture.csv,UNKNOWN,
+sample::code1,safe_code_fixture,vulnerable_code,Vulnerable Code & Software Weaknesses,Toy validation bug,input validation,vulnerable_code,1,,,CWE-20,,"Safe toy vulnerable-code metadata.",{},fixture.csv,UNKNOWN,
+sample::cti1,safe_cti_fixture,cti_taxonomy,"Threat Intelligence, CVE, Advisory & Taxonomy",Toy ATTACK technique,credential access,attack_technique,1,credential-access,T1110,,,"Safe toy ATT&CK technique description.",{},fixture.csv,UNKNOWN,
+sample::advisory1,safe_advisory_fixture,vulnerability_advisory,"Threat Intelligence, CVE, Advisory & Taxonomy",CVE-2099-0001,toy advisory,vulnerability_advisory,1,,,CWE-79,CVE-2099-0001,Safe toy advisory summary.,{},fixture.csv,UNKNOWN,
+sample::prompt1,safe_prompt_fixture,prompt_text,"AI, LLM & ML Security",Toy prompt injection,prompt injection,malicious_prompt,1,,,,,"Safe toy prompt attack description.",{},fixture.csv,UNKNOWN,
