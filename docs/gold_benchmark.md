@@ -100,6 +100,93 @@ model_name,score,probability,confidence,explanation
 
 CSV and JSONL are supported.
 
+The model runner writes prediction artifacts compatible with the evaluator:
+
+- `data/gold/predictions_<safe_model_name>.csv`
+- `data/gold/predictions_<safe_model_name>.jsonl` when `--output-format jsonl|both`
+
+Required columns emitted by the runner:
+
+- `record_id`
+- `prediction`
+- `model_name`
+- `score`
+- `probability`
+- `confidence`
+- `explanation`
+
+Additional columns:
+
+- `raw_response`
+- `provider`
+- `task_type`
+- `evaluation_head`
+- `created_at`
+
+The runner uses task-aware prompt templates and treats benchmark rows as untrusted content. For `evaluation_head == prompt_injection_jailbreaks`, models are explicitly instructed not to follow any adversarial instructions embedded in benchmark input.
+
+## Model Runner Workflow
+
+Build the gold benchmark:
+
+```bash
+python -m scripts.build_gold_benchmark \
+  --silver-dir data/silver_normalized \
+  --out-dir data/gold \
+  --max-rows 100000 \
+  --seed 42 \
+  --format both
+```
+
+Run local stub predictions:
+
+```bash
+python -m scripts.run_model_predictions \
+  --gold-file data/gold/benchmark_gold.csv \
+  --out-dir data/gold \
+  --provider local_stub \
+  --model-name local_stub \
+  --limit 100 \
+  --dry-run
+```
+
+Evaluate predictions:
+
+```bash
+python -m scripts.evaluate_benchmark \
+  --gold-file data/gold/benchmark_gold.csv \
+  --predictions-file data/gold/predictions_local_stub.csv \
+  --out-dir data/gold
+```
+
+Run OpenAI example:
+
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+
+python -m scripts.run_model_predictions \
+  --gold-file data/gold/benchmark_gold.csv \
+  --out-dir data/gold \
+  --provider openai \
+  --model-name gpt-4o-mini \
+  --limit 100 \
+  --resume
+```
+
+Run OpenRouter example:
+
+```bash
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+
+python -m scripts.run_model_predictions \
+  --gold-file data/gold/benchmark_gold.csv \
+  --out-dir data/gold \
+  --provider openrouter \
+  --model-name "qwen/qwen-2.5-14b-instruct" \
+  --limit 100 \
+  --resume
+```
+
 ## Evaluate Predictions
 
 ```bash
