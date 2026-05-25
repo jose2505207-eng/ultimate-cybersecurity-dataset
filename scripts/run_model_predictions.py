@@ -20,6 +20,9 @@ from scripts.build_gold_benchmark import DEFAULT_OUT_DIR, PROJECT_ROOT, read_tab
 
 
 DEFAULT_GOLD_FILE = DEFAULT_OUT_DIR / "benchmark_gold.csv"
+DEFAULT_MAX_OUTPUT_TOKENS = 128
+DEFAULT_MAX_INPUT_CHARS = 6000
+TRUNCATION_MARKER = "[TRUNCATED FOR BENCHMARK PROMPT]"
 REQUIRED_COLUMNS = [
     "record_id",
     "prediction",
@@ -62,6 +65,31 @@ def now_utc() -> str:
     """Return an ISO timestamp in UTC."""
 
     return datetime.now(tz=UTC).isoformat()
+
+
+def truncate_text(value: Any, max_chars: int) -> str:
+    """Truncate oversized prompt fields while preserving both ends."""
+
+    text = str(value or "")
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text
+    marker = f"\n{TRUNCATION_MARKER}\n"
+    budget = max_chars - len(marker)
+    if budget <= 0:
+        return marker[:max_chars]
+    head = budget // 2
+    tail = budget - head
+    return f"{text[:head]}{marker}{text[-tail:]}"
+
+
+def sanitize_prompt_row(row: pd.Series, max_input_chars: int) -> pd.Series:
+    """Return a prompt-safe row with bounded large text fields."""
+
+    sanitized = row.copy()
+    for field in ("input_text", "expected_output", "features_json"):
+        if field in sanitized.index:
+            sanitized[field] = truncate_text(sanitized.get(field), max_input_chars)
+    return sanitized
 
 
 def parse_label_set(value: Any) -> list[str]:
@@ -180,9 +208,31 @@ def parse_model_response(raw_text: str, row: pd.Series) -> ModelResult:
     )
 
 
-def build_messages(row: pd.Series) -> list[dict[str, str]]:
+def effective_max_output_tokens(task_type: str, requested_max_output_tokens: int) -> int:
+    """Choose a bounded completion length per task type."""
+
+    if requested_max_output_tokens != DEFAULT_MAX_OUTPUT_TOKENS:
+        return max(1, requested_max_output_tokens)
+    if task_type == "classification":
+        return DEFAULT_MAX_OUTPUT_TOKENS
+    return 256
+
+
+def build_provider_payload(messages: list[dict[str, str]], model_name: str, task_type: str, requested_max_output_tokens: int) -> dict[str, Any]:
+    """Build a bounded chat-completions payload."""
+
+    return {
+        "model": model_name,
+        "messages": messages,
+        "temperature": 0,
+        "max_tokens": effective_max_output_tokens(task_type, requested_max_output_tokens),
+    }
+
+
+def build_messages(row: pd.Series, max_input_chars: int = DEFAULT_MAX_INPUT_CHARS) -> list[dict[str, str]]:
     """Build safe provider-agnostic chat messages for one benchmark row."""
 
+    row = sanitize_prompt_row(row, max_input_chars=max_input_chars)
     task_type = str(row.get("task_type") or "classification")
     evaluation_head = str(row.get("evaluation_head") or "")
     labels = parse_label_set(row.get("label_set"))
@@ -226,6 +276,11 @@ def build_messages(row: pd.Series) -> list[dict[str, str]]:
         "evaluation_head": evaluation_head,
         "label_set": labels or None,
         "input_text": str(row.get("input_text") or ""),
+        "source_dataset": row.get("source_dataset"),
+        "source_type": row.get("source_type"),
+        "main_category": row.get("main_category"),
+        "difficulty": row.get("difficulty"),
+        "features_json": str(row.get("features_json") or "") or None,
         "safety_notes": str(row.get("safety_notes") or ""),
         "scoring_notes": str(row.get("scoring_notes") or ""),
     }
@@ -276,7 +331,7 @@ def deterministic_local_stub(row: pd.Series, model_name: str, seed: int) -> Mode
     )
 
 
-def call_openai_model(messages: list[dict[str, str]], model_name: str) -> str:
+def call_openai_model(messages: list[dict[str, str]], model_name: str, task_type: str, max_output_tokens: int) -> str:
     """Call the OpenAI chat completions API via the installed openai package."""
 
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -287,20 +342,22 @@ def call_openai_model(messages: list[dict[str, str]], model_name: str) -> str:
     except ImportError as exc:
         raise RuntimeError("openai package is not installed. Install it with: pip install openai") from exc
     client = OpenAI(api_key=api_key)
-    response = client.chat.completions.create(model=model_name, messages=messages, temperature=0)
+    payload = build_provider_payload(messages, model_name=model_name, task_type=task_type, requested_max_output_tokens=max_output_tokens)
+    response = client.chat.completions.create(**payload)
     content = response.choices[0].message.content
     if isinstance(content, list):
         return "".join(str(part.get("text", "")) if isinstance(part, dict) else str(part) for part in content)
     return str(content or "")
 
 
-def call_openrouter_model(messages: list[dict[str, str]], model_name: str) -> str:
+def call_openrouter_model(messages: list[dict[str, str]], model_name: str, task_type: str, max_output_tokens: int) -> str:
     """Call OpenRouter via its OpenAI-compatible chat completions API."""
 
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set.")
-    payload = json.dumps({"model": model_name, "messages": messages, "temperature": 0}).encode("utf-8")
+    body = build_provider_payload(messages, model_name=model_name, task_type=task_type, requested_max_output_tokens=max_output_tokens)
+    payload = json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
         "https://openrouter.ai/api/v1/chat/completions",
         data=payload,
@@ -329,16 +386,25 @@ def call_openrouter_model(messages: list[dict[str, str]], model_name: str) -> st
     return str(content or "")
 
 
-def run_provider(provider: str, row: pd.Series, model_name: str, seed: int, dry_run: bool) -> ModelResult:
+def run_provider(
+    provider: str,
+    row: pd.Series,
+    model_name: str,
+    seed: int,
+    dry_run: bool,
+    max_output_tokens: int,
+    max_input_chars: int,
+) -> ModelResult:
     """Dispatch to the configured provider, using local stub logic for dry runs."""
 
     if provider == "local_stub" or dry_run:
         return deterministic_local_stub(row, model_name=model_name, seed=seed)
-    messages = build_messages(row)
+    task_type = str(row.get("task_type") or "classification")
+    messages = build_messages(row, max_input_chars=max_input_chars)
     if provider == "openai":
-        return parse_model_response(call_openai_model(messages, model_name), row)
+        return parse_model_response(call_openai_model(messages, model_name, task_type, max_output_tokens), row)
     if provider == "openrouter":
-        return parse_model_response(call_openrouter_model(messages, model_name), row)
+        return parse_model_response(call_openrouter_model(messages, model_name, task_type, max_output_tokens), row)
     raise ValueError(f"unsupported provider: {provider}")
 
 
@@ -431,6 +497,8 @@ def generate_predictions(
     dry_run: bool,
     resume: bool,
     output_format: str,
+    max_output_tokens: int,
+    max_input_chars: int,
 ) -> dict[str, Any]:
     """Run the prediction pipeline and write artifacts."""
 
@@ -441,7 +509,15 @@ def generate_predictions(
     written_rows: list[dict[str, Any]] = []
     for row in pending.itertuples(index=False):
         series = pd.Series(row._asdict())
-        result = run_provider(provider, series, model_name=model_name, seed=seed, dry_run=dry_run)
+        result = run_provider(
+            provider,
+            series,
+            model_name=model_name,
+            seed=seed,
+            dry_run=dry_run,
+            max_output_tokens=max_output_tokens,
+            max_input_chars=max_input_chars,
+        )
         written_rows.append(row_to_output_dict(series, result, model_name=model_name, provider=provider))
     if "csv" in paths:
         append_csv(paths["csv"], written_rows)
@@ -451,6 +527,8 @@ def generate_predictions(
         "gold_file": str(gold_file),
         "provider": provider,
         "model_name": model_name,
+        "max_output_tokens": int(max_output_tokens),
+        "max_input_chars": int(max_input_chars),
         "requested_rows": int(len(gold)),
         "skipped_existing": int(len(existing_ids & set(gold["record_id"].astype(str)))),
         "written_rows": int(len(written_rows)),
@@ -473,6 +551,8 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--output-format", choices=["csv", "jsonl", "both"], default="csv")
+    parser.add_argument("--max-output-tokens", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS)
+    parser.add_argument("--max-input-chars", type=int, default=DEFAULT_MAX_INPUT_CHARS)
     args = parser.parse_args()
 
     model_name = args.model_name or ("local_stub" if args.provider == "local_stub" else None)
@@ -488,6 +568,8 @@ def main() -> None:
         dry_run=args.dry_run,
         resume=args.resume,
         output_format=args.output_format,
+        max_output_tokens=args.max_output_tokens,
+        max_input_chars=args.max_input_chars,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
 

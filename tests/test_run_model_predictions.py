@@ -10,10 +10,12 @@ from scripts.build_gold_benchmark import build_benchmark
 from scripts.evaluate_benchmark import evaluate
 from scripts.run_model_predictions import (
     build_messages,
+    build_provider_payload,
     extract_classification_prediction,
     generate_predictions,
     parse_model_response,
     safe_model_name,
+    truncate_text,
 )
 
 
@@ -46,6 +48,8 @@ def test_local_stub_creates_prediction_csv_with_required_columns(tmp_path):
         dry_run=False,
         resume=False,
         output_format="csv",
+        max_output_tokens=128,
+        max_input_chars=6000,
     )
     predictions_path = out_dir / "predictions_local_stub.csv"
     assert predictions_path.exists()
@@ -70,6 +74,8 @@ def test_limit_restricts_processed_rows(tmp_path):
         dry_run=False,
         resume=False,
         output_format="csv",
+        max_output_tokens=128,
+        max_input_chars=6000,
     )
     written = pd.read_csv(out_dir / "predictions_local_stub.csv")
     assert len(written) == 2
@@ -88,6 +94,8 @@ def test_resume_skips_existing_predictions(tmp_path):
         dry_run=False,
         resume=False,
         output_format="csv",
+        max_output_tokens=128,
+        max_input_chars=6000,
     )
     second = generate_predictions(
         gold_file=gold_file,
@@ -99,6 +107,8 @@ def test_resume_skips_existing_predictions(tmp_path):
         dry_run=False,
         resume=True,
         output_format="csv",
+        max_output_tokens=128,
+        max_input_chars=6000,
     )
     written = pd.read_csv(out_dir / "predictions_local_stub.csv")
     assert len(written) == 5
@@ -126,6 +136,8 @@ def test_dry_run_does_not_call_external_providers(tmp_path, monkeypatch):
         dry_run=True,
         resume=False,
         output_format="csv",
+        max_output_tokens=128,
+        max_input_chars=6000,
     )
     written = pd.read_csv(out_dir / "predictions_gpt-4o-mini.csv")
     assert len(written) == 2
@@ -163,6 +175,40 @@ def test_prompt_templates_warn_on_prompt_injection_rows(tmp_path):
     assert "jailbreak" in combined.lower()
 
 
+def test_openrouter_payload_uses_bounded_default_max_tokens():
+    messages = [{"role": "user", "content": "classify"}]
+    payload = build_provider_payload(messages, model_name="qwen/qwen-2.5-coder-32b-instruct", task_type="classification", requested_max_output_tokens=128)
+    assert payload["max_tokens"] <= 128
+    assert payload["max_tokens"] == 128
+
+
+def test_long_input_text_is_truncated():
+    text = "A" * 7000 + "TAIL"
+    truncated = truncate_text(text, 6000)
+    assert len(truncated) <= 6000
+    assert "AAAA" in truncated
+    assert "TAIL" in truncated
+    assert "[TRUNCATED FOR BENCHMARK PROMPT]" in truncated
+
+
+def test_classification_prompt_keeps_label_set_after_truncation():
+    row = pd.Series(
+        {
+            "record_id": "sample::prompt1",
+            "task_type": "classification",
+            "evaluation_head": "prompt_injection_jailbreaks",
+            "label_set": '["benign_prompt", "malicious_prompt"]',
+            "input_text": "X" * 7000,
+            "safety_notes": "Safe notes",
+            "scoring_notes": "Score notes",
+        }
+    )
+    messages = build_messages(row, max_input_chars=6000)
+    user_payload = json.loads(messages[1]["content"])
+    assert user_payload["label_set"] == ["benign_prompt", "malicious_prompt"]
+    assert "[TRUNCATED FOR BENCHMARK PROMPT]" in user_payload["input_text"]
+
+
 def test_predictions_can_be_evaluated_by_existing_evaluator(tmp_path):
     gold_file = build_gold_fixture(tmp_path)
     out_dir = tmp_path / "predictions"
@@ -176,6 +222,8 @@ def test_predictions_can_be_evaluated_by_existing_evaluator(tmp_path):
         dry_run=False,
         resume=False,
         output_format="both",
+        max_output_tokens=128,
+        max_input_chars=6000,
     )
     results, payload = evaluate(gold_file, out_dir / "predictions_local_stub.csv", tmp_path / "eval")
     assert payload["matched_rows"] == 5
