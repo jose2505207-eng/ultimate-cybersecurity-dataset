@@ -56,6 +56,18 @@ python -m scripts.build_gold_benchmark \
   --format both
 ```
 
+Run local stub predictions:
+
+```bash
+python -m scripts.run_model_predictions \
+  --gold-file data/gold/benchmark_gold.csv \
+  --out-dir data/gold \
+  --provider local_stub \
+  --model-name local_stub \
+  --limit 100 \
+  --dry-run
+```
+
 Evaluate predictions:
 
 ```bash
@@ -66,6 +78,34 @@ python -m scripts.evaluate_benchmark \
 ```
 
 Prediction files must include `record_id` and `prediction`. Optional columns are `model_name`, `score`, `probability`, `confidence`, and `explanation`.
+
+Run OpenAI predictions:
+
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+
+python -m scripts.run_model_predictions \
+  --gold-file data/gold/benchmark_gold.csv \
+  --out-dir data/gold \
+  --provider openai \
+  --model-name gpt-4o-mini \
+  --limit 100 \
+  --resume
+```
+
+Run OpenRouter predictions:
+
+```bash
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+
+python -m scripts.run_model_predictions \
+  --gold-file data/gold/benchmark_gold.csv \
+  --out-dir data/gold \
+  --provider openrouter \
+  --model-name "qwen/qwen-2.5-14b-instruct" \
+  --limit 100 \
+  --resume
+```
 
 See `docs/gold_benchmark.md` for schema, metrics, task types, and Qwen2.5-14B adapter evaluation notes.
 
