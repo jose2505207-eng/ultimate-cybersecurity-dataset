@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import statistics
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,6 +113,44 @@ def validate_adapter_artifacts(path: Path) -> dict[str, Any]:
         "ok": not missing,
         "missing_or_empty": missing,
         "files": files,
+    }
+
+
+def summarize_stability(step_metrics: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize loss, throughput, and memory stability for local runs."""
+
+    if not step_metrics:
+        return {}
+    losses = [float(item["loss"]) for item in step_metrics]
+    tps = [float(item["tokens_per_second"]) for item in step_metrics]
+    allocated = [float(item["vram_allocated_mb"]) for item in step_metrics]
+    reserved = [float(item["vram_reserved_mb"]) for item in step_metrics]
+    median_loss = statistics.median(losses)
+    spike_threshold = max(median_loss * 4.0, median_loss + 5.0, 1.0)
+    spikes = [
+        {"step": item["step"], "loss": item["loss"]}
+        for item in step_metrics
+        if float(item["loss"]) > spike_threshold
+    ]
+    return {
+        "loss_first": losses[0],
+        "loss_last": losses[-1],
+        "loss_min": min(losses),
+        "loss_max": max(losses),
+        "loss_mean": statistics.mean(losses),
+        "loss_median": median_loss,
+        "loss_spike_threshold": spike_threshold,
+        "loss_spikes": spikes,
+        "throughput_mean": statistics.mean(tps),
+        "throughput_min": min(tps),
+        "throughput_max": max(tps),
+        "throughput_stdev": statistics.pstdev(tps) if len(tps) > 1 else 0.0,
+        "vram_allocated_min_mb": min(allocated),
+        "vram_allocated_max_mb": max(allocated),
+        "vram_allocated_delta_mb": max(allocated) - min(allocated),
+        "vram_reserved_min_mb": min(reserved),
+        "vram_reserved_max_mb": max(reserved),
+        "vram_reserved_delta_mb": max(reserved) - min(reserved),
     }
 
 
@@ -520,11 +559,14 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
         lr=float(cfg["training"].get("learning_rate", 2e-4)),
         weight_decay=float(cfg["training"].get("weight_decay", 0.0)),
     )
+    learning_rate = float(cfg["training"].get("learning_rate", 2e-4))
+    checkpoint_every = int(cfg["training"].get("checkpoint_every") or 0)
 
     model.train()
     started = time.perf_counter()
     max_steps = int(cfg["training"].get("max_steps") or 1)
     step_metrics = []
+    checkpoint_validations = []
     total_train_tokens = 0
     last_loss = None
     for step in range(max_steps):
@@ -547,6 +589,7 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
                 "runtime_seconds": float(step_runtime),
                 "tokens": step_tokens,
                 "tokens_per_second": float(step_tokens / step_runtime),
+                "learning_rate": learning_rate,
                 "vram_allocated_mb": round(torch.cuda.memory_allocated() / 1024**2, 2),
                 "vram_reserved_mb": round(torch.cuda.memory_reserved() / 1024**2, 2),
             }
@@ -556,11 +599,21 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
             "[qlora] "
             f"step={current['step']}/{max_steps} "
             f"loss={current['loss']:.6f} "
+            f"lr={current['learning_rate']:.8f} "
             f"tok_s={current['tokens_per_second']:.2f} "
             f"vram_alloc_mb={current['vram_allocated_mb']:.2f} "
             f"vram_reserved_mb={current['vram_reserved_mb']:.2f}",
             flush=True,
         )
+        if checkpoint_every > 0 and current["step"] % checkpoint_every == 0:
+            step_checkpoint = output_dir / f"checkpoint-{current['step']}"
+            model.save_pretrained(str(step_checkpoint))
+            validation = validate_adapter_artifacts(step_checkpoint)
+            checkpoint_validations.append(validation)
+            print(
+                f"[qlora] cadence checkpoint step={current['step']} ok={validation['ok']} path={step_checkpoint}",
+                flush=True,
+            )
     runtime = max(time.perf_counter() - started, 1e-9)
     checkpoint_dir = output_dir / "checkpoint-1"
     final_dir = output_dir / "final_adapter"
@@ -569,6 +622,7 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
     tokenizer.save_pretrained(str(final_dir))
     checkpoint_validation = validate_adapter_artifacts(checkpoint_dir)
     final_adapter_validation = validate_adapter_artifacts(final_dir)
+    checkpoint_validations.append(checkpoint_validation)
     print(
         f"[qlora] checkpoint validation: checkpoint_ok={checkpoint_validation['ok']} "
         f"final_adapter_ok={final_adapter_validation['ok']}",
@@ -602,7 +656,9 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
         "checkpoint_dir": str(checkpoint_dir),
         "final_adapter": str(final_dir),
         "checkpoint_validation": checkpoint_validation,
+        "checkpoint_validations": checkpoint_validations,
         "final_adapter_validation": final_adapter_validation,
+        "stability_summary": summarize_stability(step_metrics),
         "smoke_mode": "manual_tiny_loop",
     }
     (output_dir / "train_metrics.json").write_text(json.dumps(metrics, indent=2, sort_keys=True), encoding="utf-8")
@@ -689,6 +745,7 @@ def main() -> None:
     parser.add_argument("--local-files-only", action="store_true", help="Use only the local Hugging Face cache.")
     parser.add_argument("--max-steps", type=int, default=None, help="Cap training steps for smoke tests.")
     parser.add_argument("--max-seq-length", type=int, default=None, help="Override tokenized sequence length.")
+    parser.add_argument("--checkpoint-every", type=int, default=None, help="Save and validate LoRA adapter checkpoints every N steps.")
     parser.add_argument("--manual-smoke", action="store_true", help="Run a direct one-step smoke loop and save adapter metrics.")
     args = parser.parse_args()
 
@@ -705,6 +762,8 @@ def main() -> None:
         cfg["training"]["max_steps"] = args.max_steps
     if args.max_seq_length is not None:
         cfg["model"]["max_seq_length"] = args.max_seq_length
+    if args.checkpoint_every is not None:
+        cfg["training"]["checkpoint_every"] = args.checkpoint_every
     source = args.dataset or cfg["dataset"].get("source", "auto")
 
     try:
