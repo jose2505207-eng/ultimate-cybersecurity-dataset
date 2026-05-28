@@ -1,0 +1,54 @@
+model:
+  name: Qwen/Qwen2.5-Coder-7B-Instruct
+  trust_remote_code: true
+  local_files_only: true
+  max_seq_length: 512
+  attn_implementation: sdpa
+
+dataset:
+  source: outputs/sft_dataset/qwen_cyber_sft_v2_20k
+  train_rows: 2048
+  eval_rows: 256
+  seed: 42
+  max_input_chars: 3500
+
+qlora:
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+training:
+  output_dir: outputs/qlora/qwen25_coder_7b_cleaned_sft_r16_512_step150
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 2
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  warmup_ratio: 0.03
+  lr_scheduler_type: cosine
+  max_grad_norm: 0.3
+  max_steps: 150
+  logging_steps: 1
+  eval_every: 25
+  eval_batches: 8
+  checkpoint_every: 50
+  save_strategy: steps
+  eval_strategy: steps
+  save_total_limit: 4
+  optim: adamw_torch
+  gradient_checkpointing: true
+  low_cpu_mem_usage: true
+  validation_max_new_tokens: 96
+  report_to: []

@@ -8,10 +8,12 @@ import pandas as pd
 
 from scripts.train_qlora import (
     assistant_payload,
+    coerce_messages,
     detect_and_load_dataset,
     load_config,
     make_chat_messages,
     split_train_eval,
+    supervised_prompt_and_answer,
 )
 
 
@@ -62,3 +64,31 @@ def test_assistant_payload_prefers_gold_label_for_classification():
     payload = json.loads(assistant_payload(row))
     assert payload["prediction"] == "benign"
 
+
+def test_detects_clean_sft_chat_directory(tmp_path):
+    messages = [
+        {"role": "system", "content": "defensive assistant"},
+        {"role": "user", "content": "Classify this safe benchmark record."},
+        {"role": "assistant", "content": '{"label":"benign"}'},
+    ]
+    (tmp_path / "train.jsonl").write_text(
+        json.dumps({"example_id": "ex_train", "source_record_id": "r_train", "split": "train", "messages": messages}) + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "eval.jsonl").write_text(
+        json.dumps({"example_id": "ex_eval", "source_record_id": "r_eval", "split": "eval", "messages": messages}) + "\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(CONFIG)
+    cfg["dataset"]["train_rows"] = 1
+    cfg["dataset"]["eval_rows"] = 1
+    table, detected, source_path = detect_and_load_dataset(tmp_path, cfg)
+    bundle = split_train_eval(table, cfg)
+    prompt_messages, answer = supervised_prompt_and_answer(bundle.train.iloc[0].to_dict(), max_input_chars=500)
+    assert detected == "sft_chat_dir"
+    assert source_path.endswith(str(tmp_path))
+    assert len(bundle.train) == 1
+    assert len(bundle.eval) == 1
+    assert [message["role"] for message in coerce_messages(bundle.train.iloc[0]["messages"])] == ["system", "user", "assistant"]
+    assert [message["role"] for message in prompt_messages] == ["system", "user"]
+    assert json.loads(answer)["label"] == "benign"

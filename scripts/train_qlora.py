@@ -30,6 +30,7 @@ DEFAULT_SILVER = PROJECT_ROOT / "data" / "silver_normalized"
 
 GOLD_REQUIRED_COLUMNS = {"record_id", "input_text", "expected_output", "task_type", "evaluation_head", "gold_label"}
 SILVER_HINT_COLUMNS = {"record_id", "source_dataset", "source_type", "main_category", "label", "binary_label"}
+SFT_CHAT_COLUMNS = {"messages"}
 
 
 class QLoRASetupError(RuntimeError):
@@ -196,8 +197,24 @@ def _discover_silver_files(path: Path) -> list[Path]:
     )
 
 
+def _load_sft_chat_dir(path: Path) -> pd.DataFrame | None:
+    frames = []
+    for split_name in ("train", "eval", "validation", "test"):
+        split_path = path / f"{split_name}.jsonl"
+        if split_path.exists():
+            df = read_table(split_path)
+            if not df.empty and SFT_CHAT_COLUMNS <= set(df.columns):
+                df = df.copy()
+                if "split" not in df.columns:
+                    df["split"] = "eval" if split_name == "validation" else split_name
+                frames.append(df)
+    if not frames:
+        return None
+    return pd.concat(frames, ignore_index=True, sort=False)
+
+
 def detect_and_load_dataset(source: str | Path, cfg: dict[str, Any]) -> tuple[pd.DataFrame, str, str]:
-    """Detect gold, silver, silver manifest, or auto source and return gold-shaped rows."""
+    """Detect gold, silver, silver manifest, SFT chat JSONL, or auto source."""
 
     source_text = str(source)
     if source_text == "auto":
@@ -215,6 +232,8 @@ def detect_and_load_dataset(source: str | Path, cfg: dict[str, Any]) -> tuple[pd
             return transform_silver_to_gold(silver, _benchmark_config(), int(cfg["dataset"].get("seed", 42))), "silver_manifest", str(source_path)
         table = read_table(source_path)
         columns = set(table.columns)
+        if SFT_CHAT_COLUMNS <= columns:
+            return table, "sft_chat", str(source_path)
         if GOLD_REQUIRED_COLUMNS <= columns:
             return table, "gold", str(source_path)
         if SILVER_HINT_COLUMNS <= columns:
@@ -222,6 +241,9 @@ def detect_and_load_dataset(source: str | Path, cfg: dict[str, Any]) -> tuple[pd
         raise QLoRASetupError(f"Could not detect dataset format for {source_path}; columns={sorted(columns)}")
 
     if source_path.is_dir():
+        sft = _load_sft_chat_dir(source_path)
+        if sft is not None:
+            return sft, "sft_chat_dir", str(source_path)
         gold = source_path / "benchmark_gold.csv"
         if gold.exists():
             return read_table(gold), "gold_dir", str(gold)
@@ -255,11 +277,34 @@ def _benchmark_config() -> dict[str, Any]:
 
 
 def split_train_eval(gold: pd.DataFrame, cfg: dict[str, Any]) -> DatasetBundle:
-    """Select tiny deterministic train/eval splits from gold-shaped rows."""
+    """Select deterministic train/eval splits from gold-shaped or SFT chat rows."""
 
     seed = int(cfg["dataset"].get("seed", 42))
     train_rows = int(cfg["dataset"].get("train_rows", 8))
     eval_rows = int(cfg["dataset"].get("eval_rows", 4))
+    if SFT_CHAT_COLUMNS <= set(gold.columns):
+        sft = gold.copy()
+        if "record_id" not in sft.columns:
+            sft["record_id"] = sft.get("example_id", sft.get("source_record_id", pd.Series([f"sft_{i}" for i in range(len(sft))])))
+        sft = sft.dropna(subset=["record_id", "messages"]).sort_values("record_id").sample(frac=1.0, random_state=seed).reset_index(drop=True)
+        if "split" in sft.columns:
+            split_values = sft["split"].astype(str)
+            train_pool = sft[split_values == "train"]
+            eval_pool = sft[split_values.isin({"eval", "validation", "test"})]
+        else:
+            train_pool = sft
+            eval_pool = sft.iloc[0:0]
+        if train_pool.empty:
+            train_pool = sft
+        train = train_pool.head(train_rows).copy()
+        eval_pool = eval_pool[~eval_pool["record_id"].astype(str).isin(set(train["record_id"].astype(str)))]
+        if eval_pool.empty:
+            eval_pool = sft[~sft["record_id"].astype(str).isin(set(train["record_id"].astype(str)))]
+        eval_df = eval_pool.head(eval_rows).copy()
+        if train.empty:
+            raise QLoRASetupError("No SFT training rows were available after dataset detection.")
+        return DatasetBundle(train=train, eval=eval_df, detected_format="", source_path="")
+
     gold = gold.dropna(subset=["record_id", "input_text"]).copy()
     gold["expected_output"] = gold["expected_output"].fillna(gold.get("gold_label", "unknown")).fillna("unknown")
     gold = gold.sort_values("record_id").sample(frac=1.0, random_state=seed).reset_index(drop=True)
@@ -304,18 +349,50 @@ def make_chat_messages(row: pd.Series, max_input_chars: int) -> list[dict[str, s
     return messages
 
 
+def coerce_messages(value: Any) -> list[dict[str, str]]:
+    """Return a normalized list of chat messages from JSON or Python objects."""
+
+    if isinstance(value, str):
+        value = json.loads(value)
+    if not isinstance(value, list):
+        raise QLoRASetupError("SFT chat rows must contain a messages list.")
+    messages = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise QLoRASetupError("Each SFT chat message must be an object with role/content.")
+        role = str(item.get("role") or "").strip()
+        content = str(item.get("content") or "")
+        if not role or not content:
+            raise QLoRASetupError("Each SFT chat message must include non-empty role and content.")
+        messages.append({"role": role, "content": content})
+    return messages
+
+
+def supervised_prompt_and_answer(record: dict[str, Any], max_input_chars: int) -> tuple[list[dict[str, str]], str]:
+    """Return prompt messages and supervised assistant answer for either schema."""
+
+    if "messages" in record and record.get("messages") is not None:
+        messages = coerce_messages(record["messages"])
+        if messages and messages[-1]["role"] == "assistant":
+            return messages[:-1], messages[-1]["content"]
+        return messages, ""
+    row = pd.Series(record)
+    return build_messages(row, max_input_chars=max_input_chars), assistant_payload(row)
+
+
 def write_prepared_jsonl(rows: pd.DataFrame, path: Path, max_input_chars: int) -> None:
     """Persist prepared chat examples for inspection/reproducibility."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         for row in rows.to_dict("records"):
-            series = pd.Series(row)
+            prompt_messages, answer = supervised_prompt_and_answer(row, max_input_chars=max_input_chars)
+            messages = [*prompt_messages, {"role": "assistant", "content": answer}]
             fh.write(
                 json.dumps(
                     {
-                        "record_id": row["record_id"],
-                        "messages": make_chat_messages(series, max_input_chars=max_input_chars),
+                        "record_id": row.get("record_id") or row.get("example_id") or row.get("source_record_id"),
+                        "messages": messages,
                     },
                     sort_keys=True,
                 )
@@ -349,20 +426,21 @@ def tokenize_rows(rows: pd.DataFrame, tokenizer: Any, cfg: dict[str, Any]) -> Ch
     max_input_chars = int(cfg["dataset"].get("max_input_chars", 3500))
     examples: list[dict[str, list[int]]] = []
     for record in rows.to_dict("records"):
-        row = pd.Series(record)
-        prompt_messages = build_messages(row, max_input_chars=max_input_chars)
-        answer = assistant_payload(row)
+        prompt_messages, answer = supervised_prompt_and_answer(record, max_input_chars=max_input_chars)
         prompt_text = tokenizer.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True)
-        full_text = prompt_text + answer + (tokenizer.eos_token or "")
-        tokenized = tokenizer(full_text, add_special_tokens=False, truncation=True, max_length=max_len)
-        prompt_ids = tokenizer(prompt_text, add_special_tokens=False, truncation=True, max_length=max_len)["input_ids"]
-        input_ids = tokenized["input_ids"]
-        labels = input_ids.copy()
-        prompt_len = min(len(prompt_ids), len(labels))
-        labels[:prompt_len] = [-100] * prompt_len
+        answer_text = answer + (tokenizer.eos_token or "")
+        answer_ids = tokenizer(answer_text, add_special_tokens=False)["input_ids"]
+        if len(answer_ids) >= max_len:
+            input_ids = answer_ids[:max_len]
+            labels = input_ids.copy()
+        else:
+            prompt_budget = max_len - len(answer_ids)
+            prompt_ids = tokenizer(prompt_text, add_special_tokens=False, truncation=True, max_length=prompt_budget)["input_ids"]
+            input_ids = prompt_ids + answer_ids
+            labels = [-100] * len(prompt_ids) + answer_ids.copy()
         if all(label == -100 for label in labels) and labels:
             labels[-1] = input_ids[-1]
-        examples.append({"input_ids": input_ids, "attention_mask": tokenized["attention_mask"], "labels": labels})
+        examples.append({"input_ids": input_ids, "attention_mask": [1] * len(input_ids), "labels": labels})
     return ChatSFTDataset(examples)
 
 
@@ -499,13 +577,56 @@ def _prepare_datasets(cfg: dict[str, Any], bundle: DatasetBundle) -> tuple[Any, 
     return tokenizer, train_dataset, eval_dataset, prep_summary, output_dir
 
 
+def evaluate_dataset_loss(model: Any, collator: DataCollatorForCausalChat, dataset: ChatSFTDataset | None, device: Any, limit: int) -> dict[str, float]:
+    """Evaluate a bounded number of batches for cheap local tracking."""
+
+    if dataset is None or len(dataset) == 0 or limit <= 0:
+        return {}
+    import torch
+
+    was_training = model.training
+    model.eval()
+    losses = []
+    tokens = 0
+    with torch.no_grad():
+        for index in range(min(limit, len(dataset))):
+            batch = collator([dataset[index]])
+            batch = {key: value.to(device) for key, value in batch.items()}
+            outputs = model(**batch)
+            losses.append(float(outputs.loss.detach().float().cpu().item()))
+            tokens += int(batch["attention_mask"].sum().item())
+    if was_training:
+        model.train()
+    return {
+        "eval_loss": float(statistics.mean(losses)) if losses else math.nan,
+        "eval_batches": float(len(losses)),
+        "eval_tokens": float(tokens),
+    }
+
+
+def learning_rate_for_step(base_lr: float, step: int, max_steps: int, warmup_ratio: float, scheduler_type: str) -> float:
+    """Small deterministic LR schedule for the manual local loop."""
+
+    warmup_steps = int(max_steps * warmup_ratio)
+    if warmup_steps > 0 and step <= warmup_steps:
+        return base_lr * (step / warmup_steps)
+    if scheduler_type == "cosine" and max_steps > warmup_steps:
+        progress = (step - warmup_steps) / max(1, max_steps - warmup_steps)
+        return base_lr * 0.5 * (1.0 + math.cos(math.pi * min(1.0, max(0.0, progress))))
+    if scheduler_type == "linear" and max_steps > warmup_steps:
+        progress = (step - warmup_steps) / max(1, max_steps - warmup_steps)
+        return base_lr * max(0.0, 1.0 - progress)
+    return base_lr
+
+
 def _generate_validation_sample(model: Any, tokenizer: Any, row: pd.Series, cfg: dict[str, Any]) -> dict[str, Any]:
     """Generate one short adapter-backed response for qualitative validation."""
 
     import torch
 
     max_input_chars = int(cfg["dataset"].get("max_input_chars", 3500))
-    messages = build_messages(row, max_input_chars=max_input_chars)
+    record = row.to_dict()
+    messages, expected_output = supervised_prompt_and_answer(record, max_input_chars=max_input_chars)
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     tokenized = tokenizer(
         prompt,
@@ -527,8 +648,8 @@ def _generate_validation_sample(model: Any, tokenizer: Any, row: pd.Series, cfg:
         )
     generated_ids = output_ids[0][tokenized["input_ids"].shape[1] :]
     return {
-        "record_id": str(row.get("record_id")),
-        "expected_output": str(row.get("expected_output") or row.get("gold_label") or ""),
+        "record_id": str(row.get("record_id") or row.get("example_id") or row.get("source_record_id") or ""),
+        "expected_output": expected_output or str(row.get("expected_output") or row.get("gold_label") or ""),
         "generated_text": tokenizer.decode(generated_ids, skip_special_tokens=True).strip(),
     }
 
@@ -554,13 +675,18 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
     collator = DataCollatorForCausalChat(pad_token_id=int(tokenizer.pad_token_id))
     device = next(model.parameters()).device
     params = [param for param in model.parameters() if param.requires_grad]
+    base_learning_rate = float(cfg["training"].get("learning_rate", 2e-4))
     optimizer = torch.optim.AdamW(
         params,
-        lr=float(cfg["training"].get("learning_rate", 2e-4)),
+        lr=base_learning_rate,
         weight_decay=float(cfg["training"].get("weight_decay", 0.0)),
     )
-    learning_rate = float(cfg["training"].get("learning_rate", 2e-4))
     checkpoint_every = int(cfg["training"].get("checkpoint_every") or 0)
+    eval_every = int(cfg["training"].get("eval_every") or 0)
+    eval_batches = int(cfg["training"].get("eval_batches") or 4)
+    grad_accum = max(1, int(cfg["training"].get("gradient_accumulation_steps", 1)))
+    warmup_ratio = float(cfg["training"].get("warmup_ratio", 0.0))
+    scheduler_type = str(cfg["training"].get("lr_scheduler_type", "constant"))
 
     model.train()
     started = time.perf_counter()
@@ -571,30 +697,41 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
     last_loss = None
     for step in range(max_steps):
         batch_started = time.perf_counter()
-        batch = collator([train_dataset[step % len(train_dataset)]])
-        batch = {key: value.to(device) for key, value in batch.items()}
-        outputs = model(**batch)
-        loss = outputs.loss
-        loss.backward()
-        optimizer.step()
+        learning_rate = learning_rate_for_step(base_learning_rate, step + 1, max_steps, warmup_ratio, scheduler_type)
+        for group in optimizer.param_groups:
+            group["lr"] = learning_rate
         optimizer.zero_grad(set_to_none=True)
+        micro_losses = []
+        step_tokens = 0
+        for micro_step in range(grad_accum):
+            row_index = ((step * grad_accum) + micro_step) % len(train_dataset)
+            batch = collator([train_dataset[row_index]])
+            batch = {key: value.to(device) for key, value in batch.items()}
+            outputs = model(**batch)
+            raw_loss = outputs.loss
+            (raw_loss / grad_accum).backward()
+            micro_losses.append(float(raw_loss.detach().float().cpu().item()))
+            step_tokens += int(batch["attention_mask"].sum().item())
+        optimizer.step()
         step_runtime = max(time.perf_counter() - batch_started, 1e-9)
-        step_tokens = int(batch["attention_mask"].sum().item())
         total_train_tokens += step_tokens
-        last_loss = loss.detach().float().cpu().item()
-        step_metrics.append(
-            {
-                "step": step + 1,
-                "loss": float(last_loss),
-                "runtime_seconds": float(step_runtime),
-                "tokens": step_tokens,
-                "tokens_per_second": float(step_tokens / step_runtime),
-                "learning_rate": learning_rate,
-                "vram_allocated_mb": round(torch.cuda.memory_allocated() / 1024**2, 2),
-                "vram_reserved_mb": round(torch.cuda.memory_reserved() / 1024**2, 2),
-            }
-        )
+        last_loss = statistics.mean(micro_losses)
+        current = {
+            "step": step + 1,
+            "loss": float(last_loss),
+            "runtime_seconds": float(step_runtime),
+            "tokens": step_tokens,
+            "tokens_per_second": float(step_tokens / step_runtime),
+            "learning_rate": learning_rate,
+            "gradient_accumulation_steps": grad_accum,
+            "vram_allocated_mb": round(torch.cuda.memory_allocated() / 1024**2, 2),
+            "vram_reserved_mb": round(torch.cuda.memory_reserved() / 1024**2, 2),
+        }
+        if eval_every > 0 and eval_dataset is not None and (step + 1) % eval_every == 0:
+            current.update(evaluate_dataset_loss(model, collator, eval_dataset, device, eval_batches))
+        step_metrics.append(current)
         current = step_metrics[-1]
+        eval_text = f" eval_loss={current['eval_loss']:.6f}" if "eval_loss" in current else ""
         print(
             "[qlora] "
             f"step={current['step']}/{max_steps} "
@@ -602,7 +739,8 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
             f"lr={current['learning_rate']:.8f} "
             f"tok_s={current['tokens_per_second']:.2f} "
             f"vram_alloc_mb={current['vram_allocated_mb']:.2f} "
-            f"vram_reserved_mb={current['vram_reserved_mb']:.2f}",
+            f"vram_reserved_mb={current['vram_reserved_mb']:.2f}"
+            f"{eval_text}",
             flush=True,
         )
         if checkpoint_every > 0 and current["step"] % checkpoint_every == 0:
@@ -615,7 +753,7 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
                 flush=True,
             )
     runtime = max(time.perf_counter() - started, 1e-9)
-    checkpoint_dir = output_dir / "checkpoint-1"
+    checkpoint_dir = output_dir / f"checkpoint-{max_steps}"
     final_dir = output_dir / "final_adapter"
     model.save_pretrained(str(checkpoint_dir))
     model.save_pretrained(str(final_dir))
@@ -631,12 +769,7 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
 
     eval_metrics: dict[str, float] = {}
     if eval_dataset is not None and len(eval_dataset) > 0:
-        model.eval()
-        with torch.no_grad():
-            eval_batch = collator([eval_dataset[0]])
-            eval_batch = {key: value.to(device) for key, value in eval_batch.items()}
-            eval_loss = model(**eval_batch).loss
-        eval_metrics["eval_loss"] = float(eval_loss.detach().float().cpu().item())
+        eval_metrics.update(evaluate_dataset_loss(model, collator, eval_dataset, device, eval_batches))
 
     generation_sample = _generate_validation_sample(model, tokenizer, bundle.eval.iloc[0] if not bundle.eval.empty else bundle.train.iloc[0], cfg)
 
@@ -647,6 +780,7 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
         "loss_history": [item["loss"] for item in step_metrics],
         "step_metrics": step_metrics,
         "train_runtime": float(runtime),
+        "gradient_accumulation_steps": grad_accum,
         "tokens_per_second": float(total_train_tokens / runtime),
         "vram_allocated_mb": round(torch.cuda.max_memory_allocated() / 1024**2, 2),
         "vram_reserved_mb": round(torch.cuda.max_memory_reserved() / 1024**2, 2),
@@ -746,7 +880,15 @@ def main() -> None:
     parser.add_argument("--max-steps", type=int, default=None, help="Cap training steps for smoke tests.")
     parser.add_argument("--max-seq-length", type=int, default=None, help="Override tokenized sequence length.")
     parser.add_argument("--checkpoint-every", type=int, default=None, help="Save and validate LoRA adapter checkpoints every N steps.")
+    parser.add_argument("--eval-every", type=int, default=None, help="Evaluate a small bounded set every N optimizer steps in manual loop.")
+    parser.add_argument("--eval-batches", type=int, default=None, help="Number of eval examples to score at each manual eval point.")
+    parser.add_argument("--learning-rate", type=float, default=None)
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=None)
+    parser.add_argument("--lora-r", type=int, default=None)
+    parser.add_argument("--lora-alpha", type=int, default=None)
+    parser.add_argument("--lora-dropout", type=float, default=None)
     parser.add_argument("--manual-smoke", action="store_true", help="Run a direct one-step smoke loop and save adapter metrics.")
+    parser.add_argument("--manual-loop", action="store_true", help="Run the direct instrumented local training loop.")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -764,13 +906,27 @@ def main() -> None:
         cfg["model"]["max_seq_length"] = args.max_seq_length
     if args.checkpoint_every is not None:
         cfg["training"]["checkpoint_every"] = args.checkpoint_every
+    if args.eval_every is not None:
+        cfg["training"]["eval_every"] = args.eval_every
+    if args.eval_batches is not None:
+        cfg["training"]["eval_batches"] = args.eval_batches
+    if args.learning_rate is not None:
+        cfg["training"]["learning_rate"] = args.learning_rate
+    if args.gradient_accumulation_steps is not None:
+        cfg["training"]["gradient_accumulation_steps"] = args.gradient_accumulation_steps
+    if args.lora_r is not None:
+        cfg["qlora"]["lora_r"] = args.lora_r
+    if args.lora_alpha is not None:
+        cfg["qlora"]["lora_alpha"] = args.lora_alpha
+    if args.lora_dropout is not None:
+        cfg["qlora"]["lora_dropout"] = args.lora_dropout
     source = args.dataset or cfg["dataset"].get("source", "auto")
 
     try:
         gold, detected, source_path = detect_and_load_dataset(source, cfg)
         bundle = split_train_eval(gold, cfg)
         bundle = DatasetBundle(bundle.train, bundle.eval, detected, source_path)
-        runner = manual_smoke_train if args.manual_smoke else train
+        runner = manual_smoke_train if (args.manual_smoke or args.manual_loop) else train
         metrics = runner(cfg, bundle, prepare_only=args.prepare_only)
         if args.prepare_only:
             print(json.dumps(metrics, indent=2, sort_keys=True))

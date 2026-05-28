@@ -280,9 +280,11 @@ def compare_variants(variant_frames: dict[str, pd.DataFrame]) -> dict[str, Any]:
     names = list(metrics)
     comparisons = []
     if len(names) >= 2:
-        base_name = names[0]
+        base_name = next((name for name in names if "base_qwen25_coder_7b_instruct" in name), names[0])
         base = metrics[base_name]
-        for name in names[1:]:
+        for name in names:
+            if name == base_name:
+                continue
             item = metrics[name]
             comparisons.append(
                 {
@@ -303,6 +305,13 @@ def load_prior_baselines(paths: list[Path], gold: pd.DataFrame) -> dict[str, pd.
         df = read_table(path)
         if not {"record_id", "prediction"} <= set(df.columns):
             continue
+        df = df.drop(
+            columns=[
+                col
+                for col in ("label", "correct", "task_type", "evaluation_head", "main_category", "source_dataset")
+                if col in df.columns
+            ]
+        )
         joined = target.merge(df, on="record_id", how="inner")
         if joined.empty:
             continue
@@ -317,12 +326,24 @@ def load_prior_baselines(paths: list[Path], gold: pd.DataFrame) -> dict[str, pd.
     return out
 
 
+def parse_named_adapter(value: str) -> tuple[str, Path]:
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("named adapters must use name=path")
+    name, path = value.split("=", 1)
+    name = name.strip()
+    if not name:
+        raise argparse.ArgumentTypeError("adapter name cannot be empty")
+    return name, Path(path)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--dataset", default="auto")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--adapter-path", type=Path, default=DEFAULT_ADAPTER)
+    parser.add_argument("--adapter-name", default="qlora_adapter_final_local")
+    parser.add_argument("--named-adapter", type=parse_named_adapter, action="append", default=[], help="Additional adapter to evaluate as name=path.")
     parser.add_argument("--limit", type=int, default=16)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-input-chars", type=int, default=3500)
@@ -372,21 +393,25 @@ def main() -> None:
         variant_frames["base_qwen25_coder_7b_instruct"] = df
         run_summaries["variants"].append(summary)
 
+    adapter_specs: list[tuple[str, Path]] = []
     if not args.skip_adapter:
-        if not args.adapter_path.exists():
-            raise SystemExit(f"adapter path does not exist: {args.adapter_path}")
+        adapter_specs.append((str(args.adapter_name), args.adapter_path))
+    adapter_specs.extend(args.named_adapter)
+    for adapter_name, adapter_path in adapter_specs:
+        if not adapter_path.exists():
+            raise SystemExit(f"adapter path does not exist: {adapter_path}")
         df, summary = generate_variant_predictions(
             gold=gold,
-            variant_name="qlora_adapter_final_local",
+            variant_name=adapter_name,
             model_name=model_name,
-            adapter_path=args.adapter_path,
+            adapter_path=adapter_path,
             out_dir=args.out_dir,
             max_input_chars=args.max_input_chars,
             max_new_tokens=args.max_new_tokens,
             max_seq_length=args.max_seq_length,
             local_files_only=args.local_files_only,
         )
-        variant_frames["qlora_adapter_final_local"] = df
+        variant_frames[adapter_name] = df
         run_summaries["variants"].append(summary)
 
     comparison = compare_variants(variant_frames)
