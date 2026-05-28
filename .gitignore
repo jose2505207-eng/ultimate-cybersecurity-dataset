@@ -34,6 +34,9 @@ data/gold/benchmark_manifest.json
 data/gold/evaluation_results.csv
 data/gold/evaluation_results.json
 
+# Local QLoRA validation artifacts and checkpoints
+outputs/qlora/
+
 # OS/editor
 .vscode/
 .idea/
