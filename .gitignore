@@ -36,6 +36,8 @@ data/gold/evaluation_results.json
 
 # Local QLoRA validation artifacts and checkpoints
 outputs/qlora/
+outputs/qlora_eval/
+outputs/sft_dataset/
 
 # OS/editor
 .vscode/

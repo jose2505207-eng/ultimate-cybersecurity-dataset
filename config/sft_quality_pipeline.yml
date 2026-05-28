@@ -1,0 +1,15 @@
+schema_version: "1.1"
+seed: 42
+max_examples: 50000
+split_ratios:
+  train: 0.80
+  eval: 0.10
+  test: 0.10
+quality:
+  min_prompt_chars: 40
+  min_target_chars: 2
+  max_input_chars: 3500
+  label_leakage_action: exclude_all
+  duplicate_action: keep_first
+outputs:
+  out_dir: outputs/sft_dataset/qwen_cyber_sft_v2
