@@ -1,10 +1,13 @@
 # Training Status
 
-Last updated: 2026-05-30 08:42 UTC
+Last updated: 2026-05-30 08:45 UTC
 
 ## Run
 
-- Status: production launch approved after validation
+- Status: running
+- Launched: 2026-05-30 08:44 UTC
+- tmux session: `qwen32b_prod`
+- Training PID at launch: `17010`
 - Model: `Qwen/Qwen2.5-Coder-32B-Instruct`
 - Training method: QLoRA, 4-bit NF4, PEFT LoRA
 - Trainable LoRA parameters: 134,217,728
