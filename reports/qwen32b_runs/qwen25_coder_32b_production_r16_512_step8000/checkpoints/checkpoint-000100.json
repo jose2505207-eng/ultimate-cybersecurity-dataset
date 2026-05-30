@@ -1,0 +1,52 @@
+{
+  "artifact_sync": {},
+  "checkpoint_dir": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-100",
+  "checkpoint_step": 100,
+  "checkpoint_validation": {
+    "files": {
+      "adapter_config.json": {
+        "bytes": 1110,
+        "exists": true
+      },
+      "adapter_model.safetensors": {
+        "bytes": 536991984,
+        "exists": true
+      }
+    },
+    "missing_or_empty": [],
+    "ok": true,
+    "path": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-100"
+  },
+  "created_at": "2026-05-30T09:31:35.189141+00:00",
+  "local_checkpoints_pruned": [],
+  "local_checkpoints_retained": [
+    "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-100"
+  ],
+  "model_name": "Qwen/Qwen2.5-Coder-32B-Instruct",
+  "output_dir": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000",
+  "run_name": "qwen25_coder_32b_production_r16_512_step8000",
+  "step_metrics": {
+    "eval_batches": 16.0,
+    "eval_loss": 0.3332148776971735,
+    "eval_tokens": 4550.0,
+    "gradient_accumulation_steps": 4,
+    "learning_rate": 2.0833333333333336e-05,
+    "loss": 0.5563253769651055,
+    "runtime_seconds": 5.609384482726455,
+    "step": 100,
+    "tokens": 1416,
+    "tokens_per_second": 252.43411364659207,
+    "vram_allocated_mb": 23514.95,
+    "vram_reserved_mb": 56362.0
+  },
+  "training_state": {
+    "checkpoint_validations_count": 1,
+    "completed_step": 100,
+    "last_loss": 0.5563253769651055,
+    "saved_at": "2026-05-30T09:31:33.542698+00:00",
+    "state_bytes": 1074531405,
+    "state_path": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-100/training_state.pt",
+    "step_metrics_count": 100,
+    "total_train_tokens": 117926
+  }
+}

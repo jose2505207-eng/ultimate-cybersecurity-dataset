@@ -1,0 +1,10 @@
+{
+  "detected_format": "sft_chat_dir",
+  "eval_rows": 9113,
+  "eval_tokens": 2644312,
+  "prepared_eval": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/prepared/eval_chat.jsonl",
+  "prepared_train": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/prepared/train_chat.jsonl",
+  "source_path": "outputs/sft_dataset/qwen_cyber_sft_v2_production_50k",
+  "train_rows": 31852,
+  "train_tokens": 9445154
+}
