@@ -6,9 +6,9 @@ model:
   attn_implementation: sdpa
 
 dataset:
-  source: outputs/sft_dataset/qwen_cyber_sft_v2_20k
-  train_rows: 4096
-  eval_rows: 512
+  source: outputs/sft_dataset/qwen_cyber_sft_v2_production_50k
+  train_rows: 31852
+  eval_rows: 9113
   seed: 42
   max_input_chars: 3500
 
@@ -29,7 +29,7 @@ qlora:
     - down_proj
 
 training:
-  output_dir: outputs/qlora/qwen25_coder_32b_cloud_validation_r16_512_step100
+  output_dir: outputs/qlora/qwen25_coder_32b_production_r16_512_step8000
   num_train_epochs: 1
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
@@ -39,10 +39,10 @@ training:
   warmup_ratio: 0.03
   lr_scheduler_type: cosine
   max_grad_norm: 0.3
-  max_steps: 100
+  max_steps: 8000
   logging_steps: 1
-  eval_every: 25
-  eval_batches: 8
+  eval_every: 100
+  eval_batches: 16
   checkpoint_every: 100
   checkpoint_keep_latest: 3
   resume_from_checkpoint: true
@@ -60,5 +60,5 @@ artifact_sync:
   push: true
   remote: origin
   branch: main
-  run_name: qwen25_coder_32b_cloud_validation_r16_512_step100
-  report_dir: reports/qwen32b_runs/qwen25_coder_32b_cloud_validation_r16_512_step100
+  run_name: qwen25_coder_32b_production_r16_512_step8000
+  report_dir: reports/qwen32b_runs/qwen25_coder_32b_production_r16_512_step8000

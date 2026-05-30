@@ -5,9 +5,13 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
+import shutil
 import statistics
+import subprocess
 import time
 from dataclasses import dataclass
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +35,7 @@ DEFAULT_SILVER = PROJECT_ROOT / "data" / "silver_normalized"
 GOLD_REQUIRED_COLUMNS = {"record_id", "input_text", "expected_output", "task_type", "evaluation_head", "gold_label"}
 SILVER_HINT_COLUMNS = {"record_id", "source_dataset", "source_type", "main_category", "label", "binary_label"}
 SFT_CHAT_COLUMNS = {"messages"}
+CHECKPOINT_DIR_RE = re.compile(r"^checkpoint-(\d+)$")
 
 
 class QLoRASetupError(RuntimeError):
@@ -115,6 +120,352 @@ def validate_adapter_artifacts(path: Path) -> dict[str, Any]:
         "missing_or_empty": missing,
         "files": files,
     }
+
+
+def now_utc() -> str:
+    """Return an ISO-8601 UTC timestamp."""
+
+    return pd.Timestamp.now(tz=UTC).isoformat()
+
+
+def safe_slug(value: str) -> str:
+    """Return a filesystem-safe slug for report directories."""
+
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("._-")
+    return slug or "run"
+
+
+def checkpoint_step(path: Path) -> int | None:
+    """Return numeric checkpoint step from a `checkpoint-N` directory."""
+
+    match = CHECKPOINT_DIR_RE.match(path.name)
+    return int(match.group(1)) if match else None
+
+
+def checkpoint_dirs(output_dir: Path) -> list[Path]:
+    """Return numeric checkpoint directories sorted by step."""
+
+    if not output_dir.exists():
+        return []
+    return sorted(
+        [path for path in output_dir.iterdir() if path.is_dir() and checkpoint_step(path) is not None],
+        key=lambda path: checkpoint_step(path) or -1,
+    )
+
+
+def latest_checkpoint(output_dir: Path) -> Path | None:
+    """Return the latest numeric checkpoint directory, if present."""
+
+    checkpoints = checkpoint_dirs(output_dir)
+    return checkpoints[-1] if checkpoints else None
+
+
+def prune_checkpoints(output_dir: Path, keep_latest: int) -> list[str]:
+    """Delete older numeric checkpoints, keeping only the latest N."""
+
+    if keep_latest <= 0:
+        return []
+    checkpoints = checkpoint_dirs(output_dir)
+    stale = checkpoints[:-keep_latest]
+    removed = []
+    for path in stale:
+        shutil.rmtree(path)
+        removed.append(str(path))
+    return removed
+
+
+def artifact_sync_config(cfg: dict[str, Any], output_dir: Path) -> dict[str, Any]:
+    """Normalize artifact sync config from either top-level or training config."""
+
+    raw = cfg.get("artifact_sync") or cfg["training"].get("artifact_sync") or {}
+    run_name = safe_slug(str(raw.get("run_name") or output_dir.name))
+    report_dir = PROJECT_ROOT / str(raw.get("report_dir") or Path("reports") / "qwen32b_runs" / run_name)
+    return {
+        "enabled": bool(raw.get("enabled", False)),
+        "push": bool(raw.get("push", True)),
+        "remote": str(raw.get("remote", "origin")),
+        "branch": str(raw.get("branch", "")),
+        "run_name": run_name,
+        "report_dir": report_dir,
+    }
+
+
+def _repo_relative(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _run_git(args: list[str]) -> dict[str, Any]:
+    proc = subprocess.run(["git", *args], cwd=PROJECT_ROOT, text=True, capture_output=True, check=False)
+    return {
+        "args": ["git", *args],
+        "returncode": proc.returncode,
+        "stdout": proc.stdout.strip(),
+        "stderr": proc.stderr.strip(),
+    }
+
+
+def commit_and_push_artifacts(paths: list[Path], message: str, sync: dict[str, Any]) -> dict[str, Any]:
+    """Commit selected artifact paths and optionally push; never raise into training."""
+
+    existing = [path for path in paths if path.exists()]
+    if not sync.get("enabled"):
+        return {"enabled": False, "paths": [_repo_relative(path) for path in existing]}
+    if not existing:
+        return {"enabled": True, "status": "no_paths"}
+
+    rel_paths = [_repo_relative(path) for path in existing]
+    try:
+        add = _run_git(["add", "--force", "--", *rel_paths])
+        diff = _run_git(["diff", "--cached", "--quiet", "--", *rel_paths])
+        result: dict[str, Any] = {"enabled": True, "paths": rel_paths, "add": add}
+        if diff["returncode"] == 0:
+            result["status"] = "no_changes"
+            return result
+        commit = _run_git(["commit", "-m", message, "--", *rel_paths])
+        result["commit"] = commit
+        if commit["returncode"] != 0:
+            result["status"] = "commit_failed"
+            return result
+        if sync.get("push", True):
+            remote = str(sync.get("remote") or "origin")
+            branch = str(sync.get("branch") or "")
+            refspec = f"HEAD:{branch}" if branch else "HEAD"
+            push = _run_git(["push", remote, refspec])
+            result["push"] = push
+            result["status"] = "pushed" if push["returncode"] == 0 else "push_failed"
+        else:
+            result["status"] = "committed_no_push"
+        return result
+    except Exception as exc:  # pragma: no cover - defensive around external git
+        return {"enabled": True, "status": "error", "paths": rel_paths, "error": str(exc)}
+
+
+def append_train_event(output_dir: Path, event: dict[str, Any]) -> Path:
+    """Append a JSONL training event under the run output directory."""
+
+    path = output_dir / "train_events.jsonl"
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(event, sort_keys=True, default=str))
+        fh.write("\n")
+    return path
+
+
+def save_training_state(
+    *,
+    checkpoint_dir: Path,
+    optimizer: Any,
+    completed_step: int,
+    total_train_tokens: int,
+    step_metrics: list[dict[str, Any]],
+    checkpoint_validations: list[dict[str, Any]],
+    last_loss: float | None,
+) -> dict[str, Any]:
+    """Persist optimizer/RNG state needed for local interruption recovery."""
+
+    import torch
+
+    state_path = checkpoint_dir / "training_state.pt"
+    summary_path = checkpoint_dir / "training_state.json"
+    state = {
+        "completed_step": int(completed_step),
+        "optimizer": optimizer.state_dict(),
+        "total_train_tokens": int(total_train_tokens),
+        "step_metrics": step_metrics,
+        "checkpoint_validations": checkpoint_validations,
+        "last_loss": last_loss,
+        "torch_rng_state": torch.get_rng_state(),
+        "cuda_rng_state_all": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
+        "saved_at": now_utc(),
+    }
+    torch.save(state, state_path)
+    summary = {
+        "completed_step": int(completed_step),
+        "total_train_tokens": int(total_train_tokens),
+        "step_metrics_count": len(step_metrics),
+        "checkpoint_validations_count": len(checkpoint_validations),
+        "last_loss": last_loss,
+        "state_path": str(state_path),
+        "state_bytes": int(state_path.stat().st_size),
+        "saved_at": state["saved_at"],
+    }
+    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    return summary
+
+
+def _torch_load(path: Path, map_location: str = "cpu") -> dict[str, Any]:
+    import torch
+
+    try:
+        return torch.load(path, map_location=map_location, weights_only=False)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+
+
+def load_training_state(checkpoint_dir: Path, optimizer: Any) -> dict[str, Any]:
+    """Load optimizer/RNG state from a local checkpoint when available."""
+
+    import torch
+
+    state_path = checkpoint_dir / "training_state.pt"
+    if not state_path.exists():
+        return {
+            "loaded": False,
+            "checkpoint_dir": str(checkpoint_dir),
+            "reason": "missing_training_state",
+            "completed_step": checkpoint_step(checkpoint_dir) or 0,
+            "step_metrics": [],
+            "checkpoint_validations": [],
+            "total_train_tokens": 0,
+            "last_loss": None,
+        }
+    state = _torch_load(state_path)
+    optimizer.load_state_dict(state["optimizer"])
+    if state.get("torch_rng_state") is not None:
+        torch.set_rng_state(state["torch_rng_state"])
+    if torch.cuda.is_available() and state.get("cuda_rng_state_all"):
+        torch.cuda.set_rng_state_all(state["cuda_rng_state_all"])
+    return {
+        "loaded": True,
+        "checkpoint_dir": str(checkpoint_dir),
+        "completed_step": int(state.get("completed_step", checkpoint_step(checkpoint_dir) or 0)),
+        "step_metrics": list(state.get("step_metrics", [])),
+        "checkpoint_validations": list(state.get("checkpoint_validations", [])),
+        "total_train_tokens": int(state.get("total_train_tokens", 0)),
+        "last_loss": state.get("last_loss"),
+    }
+
+
+def write_checkpoint_report(
+    *,
+    cfg: dict[str, Any],
+    output_dir: Path,
+    checkpoint_dir: Path,
+    current_metrics: dict[str, Any],
+    validation: dict[str, Any],
+    state_summary: dict[str, Any],
+    pruned_checkpoints: list[str],
+    sync_result: dict[str, Any] | None = None,
+) -> tuple[list[Path], dict[str, Any]]:
+    """Mirror small checkpoint metadata into a tracked reports directory."""
+
+    sync = artifact_sync_config(cfg, output_dir)
+    report_dir = Path(sync["report_dir"])
+    step = int(current_metrics["step"])
+    checkpoint_report_dir = report_dir / "checkpoints"
+    logs_dir = report_dir / "logs"
+    checkpoint_report_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
+    report_path = checkpoint_report_dir / f"checkpoint-{step:06d}.json"
+    train_events_src = output_dir / "train_events.jsonl"
+    train_events_dst = logs_dir / "train_events.jsonl"
+    prepare_src = output_dir / "prepare_summary.json"
+    prepare_dst = report_dir / "prepare_summary.json"
+
+    if train_events_src.exists():
+        shutil.copy2(train_events_src, train_events_dst)
+    if prepare_src.exists():
+        shutil.copy2(prepare_src, prepare_dst)
+
+    payload = {
+        "created_at": now_utc(),
+        "run_name": sync["run_name"],
+        "model_name": cfg["model"].get("name"),
+        "output_dir": str(output_dir),
+        "checkpoint_dir": str(checkpoint_dir),
+        "checkpoint_step": step,
+        "local_checkpoints_retained": [str(path) for path in checkpoint_dirs(output_dir)],
+        "local_checkpoints_pruned": pruned_checkpoints,
+        "checkpoint_validation": validation,
+        "training_state": state_summary,
+        "step_metrics": current_metrics,
+        "artifact_sync": sync_result or {},
+    }
+    report_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    status_path = PROJECT_ROOT / "TRAINING_STATUS.md"
+    status_lines = [
+        "# Training Status",
+        "",
+        f"Last updated: {payload['created_at']}",
+        "",
+        "## Run",
+        "",
+        f"- Status: running",
+        f"- Run name: `{payload['run_name']}`",
+        f"- Model: `{payload['model_name']}`",
+        f"- Output dir: `{payload['output_dir']}`",
+        f"- Latest checkpoint: `{payload['checkpoint_dir']}`",
+        f"- Latest checkpoint step: {payload['checkpoint_step']}",
+        f"- Checkpoint validation: {payload['checkpoint_validation'].get('ok')}",
+        f"- Local checkpoints retained: {len(payload['local_checkpoints_retained'])}",
+        f"- Local checkpoints pruned at this milestone: {len(payload['local_checkpoints_pruned'])}",
+        "",
+        "## Latest Metrics",
+        "",
+        f"- Loss: {current_metrics.get('loss')}",
+        f"- Learning rate: {current_metrics.get('learning_rate')}",
+        f"- Tokens/sec: {current_metrics.get('tokens_per_second')}",
+        f"- VRAM allocated MB: {current_metrics.get('vram_allocated_mb')}",
+        f"- VRAM reserved MB: {current_metrics.get('vram_reserved_mb')}",
+    ]
+    if "eval_loss" in current_metrics:
+        status_lines.extend(
+            [
+                f"- Eval loss: {current_metrics.get('eval_loss')}",
+                f"- Eval batches: {current_metrics.get('eval_batches')}",
+            ]
+        )
+    status_lines.extend(
+        [
+            "",
+            "## Artifact Policy",
+            "",
+            "- Heavy adapter checkpoints remain local under ignored `outputs/` paths.",
+            "- Checkpoint metadata, logs, evaluation reports, and this status file are intended for git sync.",
+        ]
+    )
+    status_path.write_text("\n".join(status_lines) + "\n", encoding="utf-8")
+    paths = [report_path, status_path]
+    if train_events_dst.exists():
+        paths.append(train_events_dst)
+    if prepare_dst.exists():
+        paths.append(prepare_dst)
+    return paths, payload
+
+
+def sync_checkpoint_artifacts(
+    *,
+    cfg: dict[str, Any],
+    output_dir: Path,
+    checkpoint_dir: Path,
+    current_metrics: dict[str, Any],
+    validation: dict[str, Any],
+    state_summary: dict[str, Any],
+    pruned_checkpoints: list[str],
+) -> dict[str, Any]:
+    """Write, commit, and push milestone checkpoint metadata if enabled."""
+
+    sync = artifact_sync_config(cfg, output_dir)
+    if not sync.get("enabled"):
+        return {"enabled": False, "status": "disabled"}
+    report_paths, _payload = write_checkpoint_report(
+        cfg=cfg,
+        output_dir=output_dir,
+        checkpoint_dir=checkpoint_dir,
+        current_metrics=current_metrics,
+        validation=validation,
+        state_summary=state_summary,
+        pruned_checkpoints=pruned_checkpoints,
+    )
+    result = commit_and_push_artifacts(
+        report_paths,
+        f"chore: qwen32b checkpoint metadata step {int(current_metrics['step'])}",
+        sync,
+    )
+    return result
 
 
 def summarize_stability(step_metrics: list[dict[str, Any]]) -> dict[str, Any]:
@@ -452,12 +803,12 @@ def _torch_dtype() -> Any:
     return torch.float16
 
 
-def setup_model(cfg: dict[str, Any]):
-    """Load Qwen in 4-bit and attach LoRA adapters."""
+def setup_model(cfg: dict[str, Any], adapter_path: Path | None = None):
+    """Load Qwen in 4-bit and attach or restore LoRA adapters."""
 
     try:
         import torch
-        from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+        from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
         from transformers import AutoModelForCausalLM, BitsAndBytesConfig
     except ImportError as exc:
         raise QLoRASetupError("Missing QLoRA dependency. Install torch, transformers, peft, accelerate, and bitsandbytes.") from exc
@@ -496,6 +847,9 @@ def setup_model(cfg: dict[str, Any]):
         model.gradient_checkpointing_enable()
     print("[qlora] preparing model for k-bit training", flush=True)
     model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=bool(cfg["training"].get("gradient_checkpointing", True)))
+    if adapter_path is not None:
+        print(f"[qlora] loading trainable adapter checkpoint: {adapter_path}", flush=True)
+        return PeftModel.from_pretrained(model, str(adapter_path), is_trainable=True)
     lora_config = LoraConfig(
         r=int(cfg["qlora"].get("lora_r", 16)),
         lora_alpha=int(cfg["qlora"].get("lora_alpha", 32)),
@@ -665,7 +1019,10 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
 
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
-    model = setup_model(cfg)
+    max_steps = int(cfg["training"].get("max_steps") or 1)
+    resume_enabled = bool(cfg["training"].get("resume_from_checkpoint", False))
+    resume_checkpoint = latest_checkpoint(output_dir) if resume_enabled else None
+    model = setup_model(cfg, adapter_path=resume_checkpoint)
     counts = parameter_counts(model)
     print(
         f"[qlora] trainable parameters: {counts['trainable_parameters']:,} / {counts['total_parameters']:,}",
@@ -687,15 +1044,93 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
     grad_accum = max(1, int(cfg["training"].get("gradient_accumulation_steps", 1)))
     warmup_ratio = float(cfg["training"].get("warmup_ratio", 0.0))
     scheduler_type = str(cfg["training"].get("lr_scheduler_type", "constant"))
+    keep_latest = int(cfg["training"].get("checkpoint_keep_latest", cfg["training"].get("save_total_limit", 0)) or 0)
+
+    step_metrics: list[dict[str, Any]] = []
+    checkpoint_validations: list[dict[str, Any]] = []
+    total_train_tokens = 0
+    last_loss = None
+    start_step = 0
+    resume_state: dict[str, Any] = {"loaded": False}
+    if resume_checkpoint is not None:
+        resume_state = load_training_state(resume_checkpoint, optimizer)
+        start_step = min(int(resume_state.get("completed_step", 0)), max_steps)
+        step_metrics = list(resume_state.get("step_metrics", []))
+        checkpoint_validations = list(resume_state.get("checkpoint_validations", []))
+        total_train_tokens = int(resume_state.get("total_train_tokens", 0))
+        last_loss = resume_state.get("last_loss")
+        append_train_event(
+            output_dir,
+            {
+                "event": "resume",
+                "created_at": now_utc(),
+                "checkpoint_dir": str(resume_checkpoint),
+                "completed_step": start_step,
+                "optimizer_state_loaded": bool(resume_state.get("loaded")),
+            },
+        )
+        print(
+            "[qlora] "
+            f"resume checkpoint={resume_checkpoint} completed_step={start_step} "
+            f"optimizer_state_loaded={bool(resume_state.get('loaded'))}",
+            flush=True,
+        )
+
+    def save_checkpoint(checkpoint_dir: Path, current_metrics: dict[str, Any]) -> dict[str, Any]:
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        model.save_pretrained(str(checkpoint_dir))
+        validation = validate_adapter_artifacts(checkpoint_dir)
+        checkpoint_validations.append(validation)
+        state_summary = save_training_state(
+            checkpoint_dir=checkpoint_dir,
+            optimizer=optimizer,
+            completed_step=int(current_metrics["step"]),
+            total_train_tokens=total_train_tokens,
+            step_metrics=step_metrics,
+            checkpoint_validations=checkpoint_validations,
+            last_loss=last_loss,
+        )
+        pruned = prune_checkpoints(output_dir, keep_latest)
+        append_train_event(
+            output_dir,
+            {
+                "event": "checkpoint",
+                "created_at": now_utc(),
+                "step": int(current_metrics["step"]),
+                "checkpoint_dir": str(checkpoint_dir),
+                "validation_ok": bool(validation["ok"]),
+                "pruned_checkpoints": pruned,
+            },
+        )
+        sync_result = sync_checkpoint_artifacts(
+            cfg=cfg,
+            output_dir=output_dir,
+            checkpoint_dir=checkpoint_dir,
+            current_metrics=current_metrics,
+            validation=validation,
+            state_summary=state_summary,
+            pruned_checkpoints=pruned,
+        )
+        append_train_event(
+            output_dir,
+            {
+                "event": "artifact_sync",
+                "created_at": now_utc(),
+                "step": int(current_metrics["step"]),
+                "artifact_sync": sync_result,
+            },
+        )
+        print(
+            "[qlora] "
+            f"checkpoint step={int(current_metrics['step'])} ok={validation['ok']} "
+            f"path={checkpoint_dir} pruned={len(pruned)} artifact_sync={sync_result.get('status')}",
+            flush=True,
+        )
+        return validation
 
     model.train()
     started = time.perf_counter()
-    max_steps = int(cfg["training"].get("max_steps") or 1)
-    step_metrics = []
-    checkpoint_validations = []
-    total_train_tokens = 0
-    last_loss = None
-    for step in range(max_steps):
+    for step in range(start_step, max_steps):
         batch_started = time.perf_counter()
         learning_rate = learning_rate_for_step(base_learning_rate, step + 1, max_steps, warmup_ratio, scheduler_type)
         for group in optimizer.param_groups:
@@ -730,6 +1165,7 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
         if eval_every > 0 and eval_dataset is not None and (step + 1) % eval_every == 0:
             current.update(evaluate_dataset_loss(model, collator, eval_dataset, device, eval_batches))
         step_metrics.append(current)
+        append_train_event(output_dir, {"event": "step", "created_at": now_utc(), **current})
         current = step_metrics[-1]
         eval_text = f" eval_loss={current['eval_loss']:.6f}" if "eval_loss" in current else ""
         print(
@@ -745,22 +1181,28 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
         )
         if checkpoint_every > 0 and current["step"] % checkpoint_every == 0:
             step_checkpoint = output_dir / f"checkpoint-{current['step']}"
-            model.save_pretrained(str(step_checkpoint))
-            validation = validate_adapter_artifacts(step_checkpoint)
-            checkpoint_validations.append(validation)
-            print(
-                f"[qlora] cadence checkpoint step={current['step']} ok={validation['ok']} path={step_checkpoint}",
-                flush=True,
-            )
+            save_checkpoint(step_checkpoint, current)
     runtime = max(time.perf_counter() - started, 1e-9)
     checkpoint_dir = output_dir / f"checkpoint-{max_steps}"
     final_dir = output_dir / "final_adapter"
-    model.save_pretrained(str(checkpoint_dir))
+    if step_metrics and int(step_metrics[-1]["step"]) == max_steps and (checkpoint_dir / "training_state.pt").exists():
+        checkpoint_validation = validate_adapter_artifacts(checkpoint_dir)
+    else:
+        final_metrics = step_metrics[-1] if step_metrics else {
+            "step": max_steps,
+            "loss": float(last_loss if last_loss is not None else 0.0),
+            "runtime_seconds": 0.0,
+            "tokens": 0,
+            "tokens_per_second": 0.0,
+            "learning_rate": learning_rate_for_step(base_learning_rate, max_steps, max_steps, warmup_ratio, scheduler_type),
+            "gradient_accumulation_steps": grad_accum,
+            "vram_allocated_mb": round(torch.cuda.memory_allocated() / 1024**2, 2),
+            "vram_reserved_mb": round(torch.cuda.memory_reserved() / 1024**2, 2),
+        }
+        checkpoint_validation = save_checkpoint(checkpoint_dir, final_metrics)
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
-    checkpoint_validation = validate_adapter_artifacts(checkpoint_dir)
     final_adapter_validation = validate_adapter_artifacts(final_dir)
-    checkpoint_validations.append(checkpoint_validation)
     print(
         f"[qlora] checkpoint validation: checkpoint_ok={checkpoint_validation['ok']} "
         f"final_adapter_ok={final_adapter_validation['ok']}",
@@ -793,6 +1235,9 @@ def manual_smoke_train(cfg: dict[str, Any], bundle: DatasetBundle, prepare_only:
         "checkpoint_validations": checkpoint_validations,
         "final_adapter_validation": final_adapter_validation,
         "stability_summary": summarize_stability(step_metrics),
+        "resume": resume_state,
+        "checkpoint_keep_latest": keep_latest,
+        "local_checkpoints_retained": [str(path) for path in checkpoint_dirs(output_dir)],
         "smoke_mode": "manual_tiny_loop",
     }
     (output_dir / "train_metrics.json").write_text(json.dumps(metrics, indent=2, sort_keys=True), encoding="utf-8")
@@ -880,6 +1325,7 @@ def main() -> None:
     parser.add_argument("--max-steps", type=int, default=None, help="Cap training steps for smoke tests.")
     parser.add_argument("--max-seq-length", type=int, default=None, help="Override tokenized sequence length.")
     parser.add_argument("--checkpoint-every", type=int, default=None, help="Save and validate LoRA adapter checkpoints every N steps.")
+    parser.add_argument("--keep-checkpoints", type=int, default=None, help="Keep only the latest N local checkpoint directories.")
     parser.add_argument("--eval-every", type=int, default=None, help="Evaluate a small bounded set every N optimizer steps in manual loop.")
     parser.add_argument("--eval-batches", type=int, default=None, help="Number of eval examples to score at each manual eval point.")
     parser.add_argument("--learning-rate", type=float, default=None)
@@ -889,9 +1335,17 @@ def main() -> None:
     parser.add_argument("--lora-dropout", type=float, default=None)
     parser.add_argument("--manual-smoke", action="store_true", help="Run a direct one-step smoke loop and save adapter metrics.")
     parser.add_argument("--manual-loop", action="store_true", help="Run the direct instrumented local training loop.")
+    parser.add_argument("--resume", action="store_true", help="Resume manual-loop training from the latest local checkpoint.")
+    parser.add_argument("--no-resume", action="store_true", help="Disable config-driven manual-loop resume.")
+    parser.add_argument("--sync-git-artifacts", action="store_true", help="Commit and push small checkpoint metadata/log artifacts.")
+    parser.add_argument("--no-sync-git-artifacts", action="store_true", help="Disable config-driven artifact git sync.")
+    parser.add_argument("--artifact-report-dir", type=str, default=None, help="Tracked report directory for checkpoint metadata/log mirrors.")
+    parser.add_argument("--artifact-run-name", type=str, default=None, help="Run name used in tracked artifact reports.")
+    parser.add_argument("--no-git-push-artifacts", action="store_true", help="Commit artifact reports locally but do not push.")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+    cfg.setdefault("artifact_sync", {})
     if args.train_rows is not None:
         cfg["dataset"]["train_rows"] = args.train_rows
     if args.eval_rows is not None:
@@ -906,6 +1360,9 @@ def main() -> None:
         cfg["model"]["max_seq_length"] = args.max_seq_length
     if args.checkpoint_every is not None:
         cfg["training"]["checkpoint_every"] = args.checkpoint_every
+    if args.keep_checkpoints is not None:
+        cfg["training"]["checkpoint_keep_latest"] = args.keep_checkpoints
+        cfg["training"]["save_total_limit"] = args.keep_checkpoints
     if args.eval_every is not None:
         cfg["training"]["eval_every"] = args.eval_every
     if args.eval_batches is not None:
@@ -920,6 +1377,20 @@ def main() -> None:
         cfg["qlora"]["lora_alpha"] = args.lora_alpha
     if args.lora_dropout is not None:
         cfg["qlora"]["lora_dropout"] = args.lora_dropout
+    if args.resume:
+        cfg["training"]["resume_from_checkpoint"] = True
+    if args.no_resume:
+        cfg["training"]["resume_from_checkpoint"] = False
+    if args.sync_git_artifacts:
+        cfg["artifact_sync"]["enabled"] = True
+    if args.no_sync_git_artifacts:
+        cfg["artifact_sync"]["enabled"] = False
+    if args.artifact_report_dir:
+        cfg["artifact_sync"]["report_dir"] = args.artifact_report_dir
+    if args.artifact_run_name:
+        cfg["artifact_sync"]["run_name"] = args.artifact_run_name
+    if args.no_git_push_artifacts:
+        cfg["artifact_sync"]["push"] = False
     source = args.dataset or cfg["dataset"].get("source", "auto")
 
     try:

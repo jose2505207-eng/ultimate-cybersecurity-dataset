@@ -8,10 +8,13 @@ import pandas as pd
 
 from scripts.train_qlora import (
     assistant_payload,
+    checkpoint_dirs,
+    latest_checkpoint,
     coerce_messages,
     detect_and_load_dataset,
     load_config,
     make_chat_messages,
+    prune_checkpoints,
     split_train_eval,
     supervised_prompt_and_answer,
 )
@@ -92,3 +95,16 @@ def test_detects_clean_sft_chat_directory(tmp_path):
     assert [message["role"] for message in coerce_messages(bundle.train.iloc[0]["messages"])] == ["system", "user", "assistant"]
     assert [message["role"] for message in prompt_messages] == ["system", "user"]
     assert json.loads(answer)["label"] == "benign"
+
+
+def test_checkpoint_pruning_keeps_latest_three_numeric_dirs(tmp_path):
+    for name in ("checkpoint-100", "checkpoint-200", "checkpoint-300", "checkpoint-400", "final_adapter", "checkpoint-draft"):
+        (tmp_path / name).mkdir()
+
+    removed = prune_checkpoints(tmp_path, keep_latest=3)
+
+    assert [path.name for path in checkpoint_dirs(tmp_path)] == ["checkpoint-200", "checkpoint-300", "checkpoint-400"]
+    assert latest_checkpoint(tmp_path).name == "checkpoint-400"
+    assert str(tmp_path / "checkpoint-100") in removed
+    assert (tmp_path / "final_adapter").exists()
+    assert (tmp_path / "checkpoint-draft").exists()

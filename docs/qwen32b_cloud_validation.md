@@ -36,7 +36,8 @@ Use a single 80GB GPU first. For QLoRA, this is lower risk than starting with FS
 - Gradient accumulation: 4.
 - Max steps: 100.
 - Eval cadence: every 25 optimizer steps, 8 eval examples per cadence.
-- Checkpoint cadence: every 25 optimizer steps plus final adapter export.
+- Checkpoint cadence: every 100 optimizer steps plus final adapter export.
+- Checkpoint retention: latest 3 local `checkpoint-N/` directories.
 
 The Accelerate config in `config/accelerate_qwen32b_single_gpu.yml` records the intended first-run strategy. Do not use multi-GPU FSDP or DeepSpeed until this single-GPU validation passes.
 
@@ -107,9 +108,14 @@ python -m scripts.train_qlora \
   --eval-rows 512 \
   --max-steps 100 \
   --max-seq-length 512 \
-  --checkpoint-every 25 \
+  --checkpoint-every 100 \
+  --keep-checkpoints 3 \
   --eval-every 25 \
   --eval-batches 8 \
+  --resume \
+  --sync-git-artifacts \
+  --artifact-report-dir reports/qwen32b_runs/qwen25_coder_32b_cloud_validation_r16_512_step100 \
+  --artifact-run-name qwen25_coder_32b_cloud_validation_r16_512_step100 \
   --manual-loop \
   2>&1 | tee outputs/qlora/qwen25_coder_32b_cloud_validation_r16_512_step100/cloud_train.log
 ```
@@ -141,11 +147,9 @@ Expected artifacts:
 - `cloud_train.log`
 - `train_metrics.json`
 - `prepare_summary.json`
-- `checkpoint-25/`
-- `checkpoint-50/`
-- `checkpoint-75/`
 - `checkpoint-100/`
 - `final_adapter/`
+- tracked checkpoint metadata under `reports/qwen32b_runs/...`
 
 Copy artifacts off the instance after each successful checkpoint:
 
@@ -155,7 +159,7 @@ rsync -av outputs/qlora/qwen25_coder_32b_cloud_validation_r16_512_step100/ <USER
 
 For object storage, use `rclone sync` to S3, R2, Backblaze, or your provider bucket.
 
-The current training loop saves valid LoRA adapter checkpoints and metrics. It does not yet restore optimizer state from a checkpoint. For this first 100-step validation that is acceptable. Before long cloud runs, add explicit resume support that loads the most recent adapter and persists optimizer/scheduler state.
+The current manual training loop saves valid LoRA adapter checkpoints, optimizer/RNG state, metrics, and tracked checkpoint metadata. On restart with resume enabled, it loads the latest local numeric checkpoint, restores the trainable PEFT adapter, restores optimizer/RNG state from `training_state.pt` when present, and continues from the completed optimizer step. Heavy adapter weights stay in ignored local `outputs/`; small metadata/log/evaluation reports are mirrored to `reports/qwen32b_runs/...` and pushed through git.
 
 ## Expected Behavior
 
