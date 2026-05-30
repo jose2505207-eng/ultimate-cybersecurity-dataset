@@ -1,0 +1,53 @@
+{
+  "artifact_sync": {},
+  "checkpoint_dir": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-200",
+  "checkpoint_step": 200,
+  "checkpoint_validation": {
+    "files": {
+      "adapter_config.json": {
+        "bytes": 1110,
+        "exists": true
+      },
+      "adapter_model.safetensors": {
+        "bytes": 536991984,
+        "exists": true
+      }
+    },
+    "missing_or_empty": [],
+    "ok": true,
+    "path": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-200"
+  },
+  "created_at": "2026-05-30T09:40:36.922004+00:00",
+  "local_checkpoints_pruned": [],
+  "local_checkpoints_retained": [
+    "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-100",
+    "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-200"
+  ],
+  "model_name": "Qwen/Qwen2.5-Coder-32B-Instruct",
+  "output_dir": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000",
+  "run_name": "qwen25_coder_32b_production_r16_512_step8000",
+  "step_metrics": {
+    "eval_batches": 16.0,
+    "eval_loss": 0.11301745712262345,
+    "eval_tokens": 4550.0,
+    "gradient_accumulation_steps": 4,
+    "learning_rate": 4.166666666666667e-05,
+    "loss": 0.18209985503926873,
+    "runtime_seconds": 4.458265168592334,
+    "step": 200,
+    "tokens": 723,
+    "tokens_per_second": 162.17070377361208,
+    "vram_allocated_mb": 23451.69,
+    "vram_reserved_mb": 28482.0
+  },
+  "training_state": {
+    "checkpoint_validations_count": 2,
+    "completed_step": 200,
+    "last_loss": 0.18209985503926873,
+    "saved_at": "2026-05-30T09:40:35.235675+00:00",
+    "state_bytes": 1074542733,
+    "state_path": "/workspace/ultimate-cybersecurity-dataset/outputs/qlora/qwen25_coder_32b_production_r16_512_step8000/checkpoint-200/training_state.pt",
+    "step_metrics_count": 200,
+    "total_train_tokens": 236038
+  }
+}
