@@ -1,5 +1,4 @@
 # Ultimate Cybersecurity Research Dataset
-<img width="1536" height="1024" alt="dataset" src="https://github.com/user-attachments/assets/dadfc72d-f635-42e6-8f9c-80a352b5f4c6" />
 
 Framework-first repository for building a normalized mixed cybersecurity research benchmark capped at 100,000 rows.
 
@@ -10,6 +9,7 @@ This project separates raw source acquisition, source-specific cleaning, and fin
 - `data/gold/`: multi-head evaluation benchmark files.
 - `data/gold_unified/`: legacy merged benchmark files.
 - `data/reports/`: validation and coverage reports.
+<img width="1672" height="941" alt="dataset" src="https://github.com/user-attachments/assets/d91384ab-6635-4921-9c67-ce0f73eea703" />
 
 The v1 scaffold does not download large, gated, credentialed, or license-sensitive datasets. Dataset access requirements are tracked in `config/datasets.yaml` and `LICENSE_NOTES.md`.
 
