@@ -1,7 +1,7 @@
 PYTHONPATH := src
 export PYTHONPATH
 
-.PHONY: test validate smoke inventory build-silver build-gold build-gold-benchmark evaluate-benchmark sample-10k sample-50k sample-100k clean
+.PHONY: test validate smoke inventory build-silver build-gold build-gold-benchmark build-gold-unified fetch-fresh gold-demo evaluate-benchmark sample-10k sample-50k sample-100k clean
 
 test:
 	pytest
@@ -25,6 +25,15 @@ build-gold:
 
 build-gold-benchmark:
 	python -m scripts.build_gold_benchmark --silver-dir data/silver_normalized --out-dir data/gold --max-rows 100000 --format both
+
+build-gold-unified:
+	python -m cyberdataset.gold.build_gold --silver-dir data/silver_normalized --out-dir data/gold --min-quality 0.50 --seed 42
+
+fetch-fresh:
+	python -m cyberdataset.scrapers.fetch_fresh --sources cisa_kev,osv,nvd --out-dir data/bronze_raw/fresh --cache-dir .cache/fresh_scraper --limit 1000
+
+gold-demo:
+	bash examples/run_gold_demo.sh
 
 evaluate-benchmark:
 	@test -n "$(PREDICTIONS)" || (echo "Set PREDICTIONS=path/to/predictions.csv"; exit 1)

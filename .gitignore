@@ -1,5 +1,7 @@
 # Python
 .venv/
+venv/
+*.egg-info/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -33,6 +35,16 @@ data/gold/benchmark_gold.parquet
 data/gold/benchmark_manifest.json
 data/gold/evaluation_results.csv
 data/gold/evaluation_results.json
+
+# Gold unified layer generated outputs (regenerable)
+data/gold/gold_unified.jsonl
+data/gold/gold_unified.parquet
+data/gold/manifest.json
+data/gold/dataset_card.md
+
+# Fresh-data scraper cache and demo outputs (regenerable)
+.cache/
+examples/gold_demo/
 
 # OS/editor
 .vscode/
