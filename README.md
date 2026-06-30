@@ -86,12 +86,31 @@ python -m cyberdataset.gold.build_gold \
 # equivalent: python -m scripts.build_gold_unified ...
 ```
 
+This is the single script that unifies the Silver layer into the Gold layer.
+It scans every silver source, maps each row into the canonical schema,
+deduplicates, quality-scores, and assigns deterministic splits.
+
 Outputs:
 
 - `data/gold/gold_unified.jsonl` (always)
 - `data/gold/gold_unified.parquet` (when `pyarrow` is installed)
 - `data/gold/manifest.json` — counts by source/domain/category/label/split and duplicates removed
 - `data/gold/dataset_card.md` — generated dataset card
+
+Try it instantly on the bundled fixtures (no 200GB needed) — same script,
+pointed at the tracked silver sample:
+
+```bash
+python -m cyberdataset.gold.build_gold \
+  --silver-dir examples/silver_sample \
+  --out-dir examples/gold_demo \
+  --min-quality 0.40 --seed 42
+# or simply: bash examples/run_gold_demo.sh
+```
+
+Only the silver fixtures (`examples/silver_sample/`) are tracked in git — they
+show the per-source modules. The gold output is regenerable, so it is written to
+the gitignored `examples/gold_demo/` on demand rather than committed.
 
 Canonical schema (one flat row per example):
 
@@ -101,6 +120,64 @@ processed_at, domain, category, subcategory, task_type, raw_text,
 normalized_text, label, severity, cwe, cve, mitre_attack_ids, language,
 entities, metadata, quality_score, dedup_hash, split
 ```
+
+### Add a New Module to the Silver Layer
+
+A "module" is one source directory under `data/silver_normalized/`. The gold
+builder auto-discovers every subdirectory, so adding a source needs **no code
+changes** — just drop a normalized file into a new directory:
+
+```
+data/silver_normalized/
+  <source_id>/
+    <source_id>.parquet          # or .csv.gz / .jsonl / .csv
+    <source_id>_metadata.json    # optional: source_dataset, license, source_url, ...
+```
+
+Rules the builder follows:
+
+- The **directory name becomes `source_id`** (slugified). Use one directory per
+  source, e.g. `cti_capec_attack_patterns/`.
+- One **richest representation per directory** is read (`parquet` > `csv.gz` >
+  `jsonl` > `csv`), so duplicate formats of the same data are never double-counted.
+- The optional `*_metadata.json` supplies `source_name` (`source_dataset` key)
+  and `source_license` (`license` key); missing values fall back to the directory
+  name and `"unknown"`.
+- Directories whose name starts with `_` are skipped (reserved for shared assets
+  like manifests).
+
+You can populate a module two ways:
+
+1. **From the scraper:** fetch into Bronze, then normalize with the matching
+   ingest adapter (see below) — `fresh bronze → silver`.
+2. **Directly:** write an already-normalized file into the new directory.
+
+To preview that a new module is picked up before a full build:
+
+```bash
+python -c "from cyberdataset.gold.build_gold import discover_silver_files; \
+print([s.source_id for s in discover_silver_files('data/silver_normalized')])"
+```
+
+### Merge All Modules into Gold
+
+Merging is a single re-run of the builder over the whole silver directory — it
+scans **every** module, maps each row into the canonical schema, deduplicates
+**across sources** by stable content hash, quality-scores, splits, and writes the
+combined output:
+
+```bash
+python -m cyberdataset.gold.build_gold \
+  --silver-dir data/silver_normalized \
+  --out-dir data/gold \
+  --min-quality 0.50 --seed 42
+```
+
+After it finishes, `data/gold/manifest.json` lists `sources_scanned` and the
+per-source / per-domain / per-split counts, so you can confirm the new module was
+merged. Because dedup and splits are deterministic (seeded content hashing),
+re-running after adding a module yields a stable, reproducible gold set — only the
+new, non-duplicate records are added.
 
 ### Fetch Fresh Public Data
 
@@ -124,15 +201,6 @@ collects PII.
 normalized by the matching `cyberdataset.ingest.*` adapter (e.g.
 `ingest_cisa_kev`, `ingest_nvd`, `ingest_osv`) into a silver dataset, then merged
 into the unified layer by re-running `cyberdataset.gold.build_gold`.
-
-### Run the tiny demo (no 200GB needed)
-
-```bash
-bash examples/run_gold_demo.sh
-```
-
-Builds a small gold dataset and manifest from the fixtures in
-`examples/silver_sample/`.
 
 ## What This Demonstrates
 
